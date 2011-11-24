@@ -1,0 +1,177 @@
+--------------------Configuration: disksim - Win32 Debug--------------------
+
+
+Microsoft (R) Program Maintenance Utility   Version 1.62.7022
+Copyright (C) Microsoft Corp 1988-1997. All rights reserved.
+
+ cl /c /Zi /DASSERTS disksim.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim.c
+ cl /c /Zi /DASSERTS disksim_intr.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_intr.c
+ cl /c /Zi /DASSERTS disksim_cache.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_cache.c
+ cl /c /Zi /DASSERTS disksim_pfsim.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_pfsim.c
+ cl /c /Zi /DASSERTS disksim_pfdisp.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_pfdisp.c
+ cl /c /Zi /DASSERTS disksim_synthio.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_synthio.c
+ cl /c /Zi /DASSERTS disksim_iotrace.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_iotrace.c
+ cl /c /Zi /DASSERTS disksim_iosim.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_iosim.c
+ cl /c /Zi /DASSERTS disksim_logorg.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_logorg.c
+ cl /c /Zi /DASSERTS disksim_redun.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_redun.c
+ cl /c /Zi /DASSERTS disksim_ioqueue.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_ioqueue.c
+ cl /c /Zi /DASSERTS disksim_iodriver.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_iodriver.c
+ cl /c /Zi /DASSERTS disksim_bus.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_bus.c
+ cl /c /Zi /DASSERTS disksim_controller.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_controller.c
+ cl /c /Zi /DASSERTS disksim_ctlrdumb.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_ctlrdumb.c
+ cl /c /Zi /DASSERTS disksim_ctlrsmart.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_ctlrsmart.c
+ cl /c /Zi /DASSERTS disksim_disk.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_disk.c
+ cl /c /Zi /DASSERTS disksim_diskctlr.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_diskctlr.c
+ cl /c /Zi /DASSERTS disksim_diskcache.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_diskcache.c
+ cl /c /Zi /DASSERTS disksim_diskmap.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_diskmap.c
+ cl /c /Zi /DASSERTS disksim_diskmech.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_diskmech.c
+ cl /c /Zi /DASSERTS disksim_stat.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_stat.c
+ cl /c /Zi /DASSERTS disksim_rand48.c
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+disksim_rand48.c
+ cl /Zi /DASSERTS /Fedisksim disksim.obj disksim_intr.obj disksim_cache.obj disksim_pfsim.obj disksim_pfdisp.obj disksim_synthio.obj disksim_iotrace.obj disksim_iosim.obj disksim_logorg.obj disksim_redun.obj disksim_ioqueue.obj disksim_iodriver.obj disksim_bus.obj disksim_controller.obj disksim_ctlrdumb.obj disksim_ctlrsmart.obj disksim_disk.obj disksim_diskctlr.obj disksim_diskcache.obj disksim_diskmap.obj disksim_diskmech.obj disksim_stat.obj disksim_rand48.obj 
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+Microsoft (R) 32-Bit Incremental Linker Version 5.00.7022
+Copyright (C) Microsoft Corp 1992-1997. All rights reserved.
+
+/debug 
+/out:disksim.exe 
+disksim.obj 
+disksim_intr.obj 
+disksim_cache.obj 
+disksim_pfsim.obj 
+disksim_pfdisp.obj 
+disksim_synthio.obj 
+disksim_iotrace.obj 
+disksim_iosim.obj 
+disksim_logorg.obj 
+disksim_redun.obj 
+disksim_ioqueue.obj 
+disksim_iodriver.obj 
+disksim_bus.obj 
+disksim_controller.obj 
+disksim_ctlrdumb.obj 
+disksim_ctlrsmart.obj 
+disksim_disk.obj 
+disksim_diskctlr.obj 
+disksim_diskcache.obj 
+disksim_diskmap.obj 
+disksim_diskmech.obj 
+disksim_stat.obj 
+disksim_rand48.obj 
+ cl rms.c /Ferms
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+rms.c
+Microsoft (R) 32-Bit Incremental Linker Version 5.00.7022
+Copyright (C) Microsoft Corp 1992-1997. All rights reserved.
+
+/out:rms.exe 
+rms.obj 
+ cl hplcomb.c /Fehplcomb
+Microsoft (R) 32-bit C/C++ Optimizing Compiler Version 11.00.7022 for 80x86
+Copyright (C) Microsoft Corp 1984-1997. All rights reserved.
+
+hplcomb.c
+Microsoft (R) 32-Bit Incremental Linker Version 5.00.7022
+Copyright (C) Microsoft Corp 1992-1997. All rights reserved.
+
+/out:hplcomb.exe 
+hplcomb.obj 
+
+
+
+disksim.exe - 0 error(s), 0 warning(s)
