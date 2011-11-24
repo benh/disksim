@@ -39,6 +39,10 @@
 #include "mems_global.h"
 #include "mems_mapping.h"
 
+#ifdef _WIN32
+#define inline __inline
+#define __inline__ __inline
+#endif
 
 mems_sled_t *
 mems_lbn_to_sled (mems_t *dev, int lbn)

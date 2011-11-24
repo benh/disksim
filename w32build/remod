@@ -1,0 +1,44 @@
+#!/bin/sh
+
+# run this under Cygwin bash to generate the model modules
+
+cd ../src/modules
+FILES="*.modspec"
+for f in $FILES
+do
+   echo $f
+   perl ../../libparam/mod.pl disksim $f
+done
+echo $FILES
+perl ../../libparam/make_modules_h.pl disksim $FILES > modules.h
+
+cd ../../diskmodel/modules
+FILES="*.modspec"
+for f in $FILES
+do
+   echo $f
+   perl ../../libparam/mod.pl dm $f
+done
+echo $FILES
+perl ../../libparam/make_modules_h.pl dm $FILES > modules.h
+
+cd ../../memsmodel/modules
+FILES="*.modspec"
+for f in $FILES
+do
+   echo $f
+   perl ../../libparam/mod.pl memsmodel $f
+done
+echo $FILES
+perl ../../libparam/make_modules_h.pl memsmodel $FILES > modules.h
+
+cd ../../ssdmodel/modules
+FILES="*.modspec"
+for f in $FILES
+do
+   echo $f
+   perl ../../libparam/mod.pl ssdmodel $f
+done
+echo $FILES
+perl ../../libparam/make_modules_h.pl ssdmodel $FILES > modules.h
+

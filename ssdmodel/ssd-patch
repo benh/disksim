@@ -1,0 +1,3723 @@
+diff -Naur disksim-4.0/.paths 4.0+ssd+Win/.paths
+--- disksim-4.0/.paths	2007-03-07 17:29:22.000000000 -0800
++++ 4.0+ssd+Win/.paths	2008-08-18 15:22:07.633641200 -0700
+@@ -1,4 +1,4 @@
+-# libdisksim 
++# libdisksim
+ export LIBDISKSIM_PREFIX=
+ export LIBDISKSIM_INCL=$(LIBDISKSIM_PREFIX)/include
+ export LIBDISKSIM_CFLAGS=-I$(LIBDISKSIM_INCL)
+@@ -39,3 +39,10 @@
+ export MEMSMODEL_CFLAGS=-I$(MEMSMODEL_INCL)
+ export MEMSMODEL_LDPATH=$(MEMSMODEL_PREFIX)/lib
+ export MEMSMODEL_LDFLAGS=-L$(MEMSMODEL_LDPATH) -lmemsmodel
++
++# path to ssdmodel
++export SSDMODEL_PREFIX=ssdmodel
++export SSDMODEL_INCL=$(SSDMODEL_PREFIX)/include
++export SSDMODEL_CFLAGS=-I$(SSDMODEL_INCL)
++export SSDMODEL_LDPATH=$(SSDMODEL_PREFIX)/lib
++export SSDMODEL_LDFLAGS=-L$(SSDMODEL_LDPATH) -lssdmodel
+diff -Naur disksim-4.0/.paths.auto 4.0+ssd+Win/.paths.auto
+--- disksim-4.0/.paths.auto	2005-08-05 11:43:48.000000000 -0700
++++ 4.0+ssd+Win/.paths.auto	2008-08-13 18:49:52.000000000 -0700
+@@ -1,4 +1,4 @@
+-# libdisksim 
++# libdisksim
+ export LIBDISKSIM_PREFIX=
+ export LIBDISKSIM_INCL=$(LIBDISKSIM_PREFIX)/include
+ export LIBDISKSIM_CFLAGS=-I$(LIBDISKSIM_INCL)
+@@ -39,3 +39,10 @@
+ export MEMSMODEL_CFLAGS=-I$(MEMSMODEL_INCL)
+ export MEMSMODEL_LDPATH=$(MEMSMODEL_PREFIX)/lib
+ export MEMSMODEL_LDFLAGS=-L$(MEMSMODEL_LDPATH) -lmemsmodel
++
++# path to ssdmodel
++export SSDMODEL_PREFIX=ssdmodel
++export SSDMODEL_INCL=$(SSDMODEL_PREFIX)/include
++export SSDMODEL_CFLAGS=-I$(SSDMODEL_INCL)
++export SSDMODEL_LDPATH=$(SSDMODEL_PREFIX)/lib
++export SSDMODEL_LDFLAGS=-L$(SSDMODEL_LDPATH) -lssdmodel
+diff -Naur disksim-4.0/Makefile 4.0+ssd+Win/Makefile
+--- disksim-4.0/Makefile	2008-05-11 14:30:54.000000000 -0700
++++ 4.0+ssd+Win/Makefile	2008-09-24 16:23:27.225400200 -0700
+@@ -31,13 +31,14 @@
+ TOP_BUILDDIR=$(shell pwd)
+ include .paths
+ 
+-SUBDIRS=libddbg libparam diskmodel memsmodel src
++SUBDIRS=libddbg libparam diskmodel memsmodel ssdmodel src
+ 
+ all: 	
+ 	$(MAKE) -C libddbg
+ 	$(MAKE) -C libparam
+ 	$(MAKE) -C diskmodel
+ 	$(MAKE) -C memsmodel
++	$(MAKE) -C ssdmodel
+ 	$(MAKE) -C src
+ 	$(MAKE) -C diskmodel/layout_g4_tools
+         # If dixtrac is included, build it with the distribution
+@@ -61,10 +62,12 @@
+ 	$(MAKE) -C src/modules
+ 	$(MAKE) -C diskmodel/modules
+ 	$(MAKE) -C memsmodel/modules
++	$(MAKE) -C ssdmodel/modules
+ 
+ doc-clean:
+ 	$(MAKE) -C memsmodel/modules distclean
+ 	$(MAKE) -C diskmodel/modules distclean
++	$(MAKE) -C ssdmodel/modules distclean
+ 	$(MAKE) -C src/modules distclean
+ 	$(MAKE) -C libparam distclean
+ 	$(MAKE) -C libddbg distclean
+diff -Naur disksim-4.0/diskmodel/dm_config.h 4.0+ssd+Win/diskmodel/dm_config.h
+--- disksim-4.0/diskmodel/dm_config.h	2008-05-11 15:09:28.000000000 -0700
++++ 4.0+ssd+Win/diskmodel/dm_config.h	2008-08-15 18:31:18.000000000 -0700
+@@ -43,7 +43,12 @@
+ 
+ 
+ // undef this to turn off inlining
++#ifdef WIN32
++#define INLINE
++#else
+ #define INLINE inline
++#endif
++
+ 
+ // freebsd foo
+ #ifdef _DISKMODEL_FREEBSD
+diff -Naur disksim-4.0/diskmodel/dm_types.h 4.0+ssd+Win/diskmodel/dm_types.h
+--- disksim-4.0/diskmodel/dm_types.h	2008-05-11 15:09:29.000000000 -0700
++++ 4.0+ssd+Win/diskmodel/dm_types.h	2008-08-16 13:08:48.000000000 -0700
+@@ -38,12 +38,18 @@
+ 
+ 
+ // this ought to work and I can't figure out why it doesn't
+-#if defined _DISKMODEL_FREEBSD // || defined _BSD_SOURCE
++#ifdef _DISKMODEL_FREEBSD // || defined _BSD_SOURCE
+ #include <sys/types.h>
+ #else
++#ifdef WIN32
++typedef __int64 int64_t;
++typedef unsigned __int64 uint64_t;
++typedef unsigned __int32 uint32_t;
++typedef unsigned __int16 uint16_t;
++#else /* WIN32 */
+ #include <inttypes.h>
+-#endif // _DISKMODEL_FREEBSD
+-
++#endif /* WIN32 */
++#endif
+ 
+ // fraction of a circle
+ // each increment ends up being \pi / 2^32 radians
+diff -Naur disksim-4.0/diskmodel/layout_g1.c 4.0+ssd+Win/diskmodel/layout_g1.c
+--- disksim-4.0/diskmodel/layout_g1.c	2008-05-11 15:09:28.000000000 -0700
++++ 4.0+ssd+Win/diskmodel/layout_g1.c	2008-05-23 13:39:56.000000000 -0700
+@@ -106,7 +106,11 @@
+ 
+ // Compute start + mult*q and add x for the number of times it 
+ // wraps around 0.  This can probably be optimized.
++#ifdef WIN32
++static __inline dm_angle_t 
++#else
+ static inline dm_angle_t 
++#endif
+ addmult(dm_angle_t start, int mult, dm_angle_t q, dm_angle_t x) 
+ {
+   //  int c;
+diff -Naur disksim-4.0/diskmodel/layout_g4.c 4.0+ssd+Win/diskmodel/layout_g4.c
+--- disksim-4.0/diskmodel/layout_g4.c	2008-05-11 09:52:53.000000000 -0700
++++ 4.0+ssd+Win/diskmodel/layout_g4.c	2008-09-24 16:34:41.251400200 -0700
+@@ -32,6 +32,11 @@
+ #include "layout_g4.h"
+ #include "layout_g4_private.h"
+ 
++#ifdef _WIN32
++#define inline __inline
++#define __inline__ __inline
++#endif
++
+ static inline int min(int x, int y) {
+   return x < y ? x : y;
+ }
+@@ -183,7 +188,7 @@
+ 	       int quot,
+ 	       int resid) 
+ {
+-  ddbg_assert(p->length < G4_ALLOC_PATH);
++//ddbg_assert(p->length < G4_ALLOC_PATH);
+   struct g4_path_node *pp = &p->path[p->length];
+   
+   pp->n = n;
+@@ -575,10 +580,11 @@
+ 
+   int spt = g4_spt_pbn(d, pbn);
+ 
++  /* Dushyanth: must set l0 and ln even if ptol() returns an error */
+   lbn = ptol(d, pbn, 0);
+-  if(lbn < 0) {
+-    return lbn;
+-  }
++  //if(lbn < 0) {
++  //  return lbn;
++  //}
+ 
+   if(l0) {
+     pi = *pbn;
+@@ -607,6 +613,11 @@
+     ddbg_assert(*l0 <= *ln);
+   }
+ 
++  /* Dushyanth: check error here; see comment above about setting l0, ln */
++  if(lbn < 0) {
++    return lbn;
++  }
++
+   return DM_OK;
+ }
+ 
+@@ -763,6 +774,19 @@
+ 
+ 
+ struct dm_layout_if layout_g4 = {
++#ifdef WIN32
++  ltop,
++  ptol,
++  g4_spt_lbn,
++  g4_spt_pbn,
++  g4_track_bound, 
++  g4_skew,
++  g4_atop,
++  g4_sector_width, 
++  g4_defect_count,
++  g4_get_numzones,
++  g4_get_zone
++#else
+   .dm_translate_ltop = ltop,
+   .dm_translate_ptol = ptol,
+ 
+@@ -779,5 +803,5 @@
+   .dm_defect_count = g4_defect_count,
+   .dm_get_numzones = g4_get_numzones,
+   .dm_get_zone = g4_get_zone
+- 
++#endif
+ };
+diff -Naur disksim-4.0/diskmodel/layout_g4_load.c 4.0+ssd+Win/diskmodel/layout_g4_load.c
+--- disksim-4.0/diskmodel/layout_g4_load.c	2008-05-11 09:52:53.000000000 -0700
++++ 4.0+ssd+Win/diskmodel/layout_g4_load.c	2008-05-30 18:42:36.000000000 -0700
+@@ -39,7 +39,11 @@
+ // offset of element p in array base of size s
+ static int
+ aoffset(void *base, void *p, int s) {
++#ifdef WIN32
++  return ((char *)p - (char *)base) / s;
++#else
+   return (p - base) / s;
++#endif
+ }
+ 
+ struct lp_list *
+diff -Naur disksim-4.0/diskmodel/layout_g4_tools/.paths 4.0+ssd+Win/diskmodel/layout_g4_tools/.paths
+--- disksim-4.0/diskmodel/layout_g4_tools/.paths	2007-03-07 17:29:22.000000000 -0800
++++ 4.0+ssd+Win/diskmodel/layout_g4_tools/.paths	2008-08-19 16:37:38.741939300 -0700
+@@ -39,3 +39,10 @@
+ export MEMSMODEL_CFLAGS=-I$(MEMSMODEL_INCL)
+ export MEMSMODEL_LDPATH=$(MEMSMODEL_PREFIX)/lib
+ export MEMSMODEL_LDFLAGS=-L$(MEMSMODEL_LDPATH) -lmemsmodel
++
++# path to ssdmodel
++export SSDMODEL_PREFIX=../../ssdmodel
++export SSDMODEL_INCL=$(SSDMODEL_PREFIX)/include
++export SSDMODEL_CFLAGS=-I$(SSDMODEL_INCL)
++export SSDMODEL_LDPATH=$(SSDMODEL_PREFIX)/lib
++export SSDMODEL_LDFLAGS=-L$(SSDMODEL_LDPATH) -lssdmodel
+diff -Naur disksim-4.0/diskmodel/layout_g4_tools/Makefile 4.0+ssd+Win/diskmodel/layout_g4_tools/Makefile
+--- disksim-4.0/diskmodel/layout_g4_tools/Makefile	2007-03-06 12:58:48.000000000 -0800
++++ 4.0+ssd+Win/diskmodel/layout_g4_tools/Makefile	2008-08-19 16:38:55.881652500 -0700
+@@ -5,7 +5,7 @@
+ 
+ CFLAGS = -g $(DISKSIM_CFLAGS) $(DISKMODEL_CFLAGS) $(LIBPARAM_CFLAGS) $(LIBDDBG_CFLAGS) -Wall -Wno-unused
+ 
+-LDFLAGS = $(DISKSIM_LDFLAGS)  $(MEMSMODEL_LDFLAGS) -L.. -ldiskmodel  $(LIBPARAM_LDFLAGS) $(LIBDDBG_LDFLAGS) -lm
++LDFLAGS = $(DISKSIM_LDFLAGS)  $(MEMSMODEL_LDFLAGS) $(SSDMODEL_LDFLAGS) -L.. -ldiskmodel  $(LIBPARAM_LDFLAGS) $(LIBDDBG_LDFLAGS) -lm
+ 
+ TARGETS = g4_skews
+ all: $(TARGETS)
+diff -Naur disksim-4.0/libparam/libparam.lex 4.0+ssd+Win/libparam/libparam.lex
+--- disksim-4.0/libparam/libparam.lex	2008-05-16 14:04:35.000000000 -0700
++++ 4.0+ssd+Win/libparam/libparam.lex	2008-09-24 15:14:47.731400200 -0700
+@@ -34,13 +34,19 @@
+ 
+ %{
+ #include <string.h>
++#ifndef WIN32
+ #include <libgen.h> // dirname(), basename()
++#endif
+ #include <libddbg/libddbg.h>
+ #include <errno.h>
+ 
+ #include "libparam.h"
+ #include "libparam.tab.h"
+ 
++#ifdef WIN32
++   extern double strtod();
++#endif
++
+ #define MAX_INPUT_FILES 32
+   int top_file = 0;
+   struct lp_input_file input_files[MAX_INPUT_FILES];
+@@ -140,6 +146,16 @@
+ 
+   paths[top_path++] = lp_cwd;
+ 
++#ifdef WIN32
++  // Dushyanth: an empty directory component is same as "."
++  if (!strcmp(dir, ""))
++	strcpy(dir, ".");
++	
++  if (!strcmp(lp_cwd,"")) {
++	lp_cwd = ".";
++	paths[top_path-1] = lp_cwd;
++	}
++#endif
+ 
+   // XXX move all of this logic into util.c
+ 
+@@ -186,7 +202,7 @@
+       goto fail;
+     }
+   }
+-  
++
+ 
+  fail:
+     fprintf(stderr, "*** error: couldn't open %s : %s\n", yytext, strerror(errno));
+diff -Naur disksim-4.0/libparam/mod.pl 4.0+ssd+Win/libparam/mod.pl
+--- disksim-4.0/libparam/mod.pl	2008-05-11 15:09:29.000000000 -0700
++++ 4.0+ssd+Win/libparam/mod.pl	2008-05-23 13:45:02.000000000 -0700
+@@ -402,6 +402,9 @@
+     print CODE "(void *)$i";
+     $j++;
+ }
++if($j == 0) {
++    print CODE "NULL";
++}
+ print CODE "\n};\n\n";
+ 
+ print CODE "lp_paramdep_t $MODNAME"."_deps[] = {\n";
+@@ -410,9 +413,12 @@
+     if($j > 0) {
+ 	print CODE ",\n";
+     }
+-    print CODE "(void*)$i";
++    print CODE "$i";
+     $j++;
+ }
++if($j == 0) {
++    print CODE "NULL";
++}
+ print CODE "\n};\n\n";
+ 
+ close(HEADER);
+diff -Naur disksim-4.0/libparam/util.c 4.0+ssd+Win/libparam/util.c
+--- disksim-4.0/libparam/util.c	2008-05-11 15:09:29.000000000 -0700
++++ 4.0+ssd+Win/libparam/util.c	2008-09-24 15:17:10.860400200 -0700
+@@ -38,12 +38,16 @@
+ 
+ #include <sys/types.h>
+ #include <sys/stat.h>
+-#include <unistd.h>
+ 
++#ifndef WIN32
+ #include <unistd.h>
++#else
++#include <io.h>
++#endif
++
+ #include <fcntl.h>
+ 
+-#include <libgen.h>
++//#include <libgen.h>
+ 
+ #include "libparam.h"
+ #include "bitvector.h"
+@@ -1212,15 +1216,26 @@
+   overrides_len = cli_overrides_len;
+ 
+   // do the searchpath
++#ifdef WIN32
++  lp_sp = strdup(getenv("LP_PATH"));
++#else
+   lp_sp = getenv("LP_PATH");
++#endif
+   if(lp_sp) {
+     char *p = lp_sp;
+     char *colon;
+     
+     lp_searchpath = calloc(LP_MAX_SP, sizeof(char*));
++#ifdef WIN32
++    lp_searchpath_len = 0;
++#endif
+ 
+     while(*p) {
++#ifdef _WIN32 /* colons can occur in win32 filenames, so use semicolon separator */
++	  colon = strchr(p,';');
++#else
+       colon = strchr(p, ':');
++#endif
+       if(colon) {
+ 	char *next;
+ 
+@@ -1238,6 +1253,11 @@
+     }
+   }
+ 
++#ifdef WIN32
++  free(lp_sp);
++  lp_sp = NULL;
++#endif
++
+   // this creates a fresh array every time its run so caller 
+   // is responsible for freeing it
+   lp_tlts = 0;
+@@ -1245,17 +1265,20 @@
+   
+   fflush(stdout);
+   stdout_save = dup(1);
++#ifndef WIN32
+   devnull = open("/dev/null", O_RDONLY);
+   dup2(devnull, 1);
++#endif
+ 
+   libparamparse();
+ 
+   fflush(stdout);
+-  dup2(stdout_save, 1);
+ 
++#ifndef WIN32
++  dup2(stdout_save, 1);
+   close(devnull);
+   close(stdout_save);
+-
++#endif
+ 
+   if(tlts) {
+     *tlts = lp_tlts;
+@@ -1364,14 +1387,44 @@
+ lp_search_path(char *cwd, char *name)
+ {
+   char *cand = calloc(LP_PATH_MAX, sizeof(char));
++#ifdef _WIN32
++  struct _stat s;
++#else
+   struct stat s;
++#endif
+   int i;
+   
++#ifndef _WIN32
+   if(name[0] == '/')
+     if(stat(name, &s))
+       goto fail;
++    else
++      goto succ;
+ 
+   snprintf(cand, LP_PATH_MAX, "%s/%s", cwd, name);
++  
++#else
++  if(name[0] == '\\')
++    if(stat(name, &s))
++      goto fail;
++    else
++      goto succ;
++
++  if (strcmp(cwd, "") == 0)
++      cwd = ".";
++  
++  snprintf(cand, LP_PATH_MAX, "%s\\%s", cwd, name);
++
++  /* use \ separator instead of / */
++    {
++        char *sep = cand;
++        while (*sep)
++        {
++            if (*sep == '/') *sep = '\\';
++            sep++;
++        }
++    }
++#endif
+ 
+   if(!stat(cand, &s))
+     goto succ;
+diff -Naur disksim-4.0/memsmodel/mems_hong_seek.c 4.0+ssd+Win/memsmodel/mems_hong_seek.c
+--- disksim-4.0/memsmodel/mems_hong_seek.c	2005-01-05 09:37:36.000000000 -0800
++++ 4.0+ssd+Win/memsmodel/mems_hong_seek.c	2008-05-30 17:44:32.000000000 -0700
+@@ -7,12 +7,12 @@
+ #define _VERBOSE_ 0
+ 
+ long double
+-min(long double x, long double y) {
++dmin(long double x, long double y) {
+   return (x < y) ? x : y;
+ }
+ 
+ long double
+-max(long double x, long double y) {
++dmax(long double x, long double y) {
+   return (x > y) ? x : y;
+ }
+ 
+@@ -49,8 +49,8 @@
+ 
+   long double temp_tx;
+ 
+-  x0 = min(start_offset_nm, end_offset_nm);
+-  x1 = max(start_offset_nm, end_offset_nm);
++  x0 = dmin(start_offset_nm, end_offset_nm);
++  x1 = dmax(start_offset_nm, end_offset_nm);
+ 
+   x0 /= 1e9;
+   x1 /= 1e9;
+@@ -135,8 +135,8 @@
+ 	   a, v, spring_factor);
+   }
+ 
+-  y0 = min(start_offset_nm, end_offset_nm);
+-  y1 = max(start_offset_nm, end_offset_nm);
++  y0 = dmin(start_offset_nm, end_offset_nm);
++  y1 = dmax(start_offset_nm, end_offset_nm);
+ 
+   y0 /= 1e9;
+   y1 /= 1e9;
+diff -Naur disksim-4.0/memsmodel/mems_mapping.c 4.0+ssd+Win/memsmodel/mems_mapping.c
+--- disksim-4.0/memsmodel/mems_mapping.c	2008-05-11 14:30:54.000000000 -0700
++++ 4.0+ssd+Win/memsmodel/mems_mapping.c	2008-09-24 15:46:52.070400200 -0700
+@@ -39,6 +39,10 @@
+ #include "mems_global.h"
+ #include "mems_mapping.h"
+ 
++#ifdef _WIN32
++#define inline __inline
++#define __inline__ __inline
++#endif
+ 
+ mems_sled_t *
+ mems_lbn_to_sled (mems_t *dev, int lbn)
+diff -Naur disksim-4.0/src/.paths 4.0+ssd+Win/src/.paths
+--- disksim-4.0/src/.paths	2007-03-07 17:29:22.000000000 -0800
++++ 4.0+ssd+Win/src/.paths	2008-08-18 15:14:11.661390200 -0700
+@@ -1,4 +1,4 @@
+-# libdisksim 
++# libdisksim
+ export LIBDISKSIM_PREFIX=../
+ export LIBDISKSIM_INCL=$(LIBDISKSIM_PREFIX)/include
+ export LIBDISKSIM_CFLAGS=-I$(LIBDISKSIM_INCL)
+@@ -39,3 +39,10 @@
+ export MEMSMODEL_CFLAGS=-I$(MEMSMODEL_INCL)
+ export MEMSMODEL_LDPATH=$(MEMSMODEL_PREFIX)/lib
+ export MEMSMODEL_LDFLAGS=-L$(MEMSMODEL_LDPATH) -lmemsmodel
++
++# path to ssdmodel
++export SSDMODEL_PREFIX=../ssdmodel
++export SSDMODEL_INCL=$(SSDMODEL_PREFIX)/include
++export SSDMODEL_CFLAGS=-I$(SSDMODEL_INCL)
++export SSDMODEL_LDPATH=$(SSDMODEL_PREFIX)/lib
++export SSDMODEL_LDFLAGS=-L$(SSDMODEL_LDPATH) -lssdmodel
+diff -Naur disksim-4.0/src/Makefile 4.0+ssd+Win/src/Makefile
+--- disksim-4.0/src/Makefile	2008-05-11 14:30:53.000000000 -0700
++++ 4.0+ssd+Win/src/Makefile	2008-08-19 16:36:15.417607700 -0700
+@@ -33,6 +33,7 @@
+ include .paths
+ 
+ LDFLAGS = -lm -L. -ldisksim $(DISKMODEL_LDFLAGS) $(MEMSMODEL_LDFLAGS) \
++                            $(SSDMODEL_LDFLAGS) \
+                             $(LIBPARAM_LDFLAGS) $(LIBDDBG_LDFLAGS) 
+ 
+ HP_FAST_OFLAGS = +O4
+@@ -41,7 +42,7 @@
+ DEBUG_OFLAGS = -g -DASSERTS # -DDEBUG=1
+ PROF_OFLAGS = -g -DASSERTS -p
+ GPROF_OFLAGS = -g -DASSERTS -pg
+-CFLAGS = -I. $(DISKMODEL_CFLAGS) $(LIBPARAM_CFLAGS) $(LIBDDBG_CFLAGS) $(DEBUG_OFLAGS) $(FREEBLOCKS_OFLAGS) $(MEMSMODEL_CFLAGS) -D_INLINE 
++CFLAGS = -I. $(DISKMODEL_CFLAGS) $(LIBPARAM_CFLAGS) $(LIBDDBG_CFLAGS) $(DEBUG_OFLAGS) $(FREEBLOCKS_OFLAGS) $(MEMSMODEL_CFLAGS) $(SSDMODEL_CFLAGS) -D_INLINE 
+ 
+ FBSYSSIM_OFLAGS = -O6 -fomit-frame-pointer -fexpensive-optimizations -fschedule-insns2
+ 
+diff -Naur disksim-4.0/src/disksim.c 4.0+ssd+Win/src/disksim.c
+--- disksim-4.0/src/disksim.c	2008-06-23 13:20:02.000000000 -0700
++++ 4.0+ssd+Win/src/disksim.c	2008-09-23 18:58:25.681482000 -0700
+@@ -806,8 +806,14 @@
+ 	     && (curr->type <= MEMS_MAX_EVENT)) 
+     {
+       io_internal_event ((ioreq_event *)curr);
+-    } 
+-    else if (curr->type == CHECKPOINT) 
++    }
++    /* SSD: These are ssd specific events */
++    else if ((curr->type >= SSD_MIN_EVENT)
++         && (curr->type <= SSD_MAX_EVENT))
++    {
++      io_internal_event ((ioreq_event *)curr);
++    }
++    else if (curr->type == CHECKPOINT)
+     {
+       if (disksim->checkpoint_interval) {
+ 	disksim_register_checkpoint(simtime + disksim->checkpoint_interval);
+diff -Naur disksim-4.0/src/disksim_bus.c 4.0+ssd+Win/src/disksim_bus.c
+--- disksim-4.0/src/disksim_bus.c	2008-05-11 14:30:53.000000000 -0700
++++ 4.0+ssd+Win/src/disksim_bus.c	2008-09-24 16:12:49.092400200 -0700
+@@ -739,7 +739,14 @@
+   assert(!strcmp(t->type, disksim_mods[DISKSIM_MOD_BUS]->name));
+ 
+   /* lookup bus */
+-  assert(b = getbusbyname(t->name, &busno));
++#ifdef WIN32
++   /* XXX fixed by dnarayan; don't put side-effects in the assert arg, they might get macro'd out */
++   /* original code: assert(b = getbusbyname(t->name, &busno)); */
++   b = getbusbyname(t->name, &busno);
++   assert(b);
++#else
++   assert(b = getbusbyname(t->name, &busno));
++#endif
+ 
+   b->numslots = 0;
+   for(c = 0; c < t->l->values_len; c++)
+@@ -792,6 +799,8 @@
+ 	(type == lp_mod_name("disksim_simpledisk"))
+ 	||
+ 	(type == lp_mod_name("memsmodel_mems"))
++	|| /*SSD:*/
++        (type == lp_mod_name("ssdmodel_ssd"))
+ 	)
+       {
+ 	b->slots[slotnum].devtype = DEVICE;
+diff -Naur disksim-4.0/src/disksim_device.c 4.0+ssd+Win/src/disksim_device.c
+--- disksim-4.0/src/disksim_device.c	2008-05-11 14:30:53.000000000 -0700
++++ 4.0+ssd+Win/src/disksim_device.c	2008-09-24 16:16:35.663400200 -0700
+@@ -62,6 +62,7 @@
+ #include "disksim_simpledisk.h"
+ #include "memsmodel/mems_global.h"
+ #include "memsmodel/mems_disksim.h"
++#include "ssdmodel/ssd.h"  /* SSD: */
+ #include "config.h"
+ 
+ #include "modules/modules.h"
+@@ -111,6 +112,9 @@
+       case DEVICETYPE_MEMS:
+ 	return (struct device_header *)getmems(devicenos[c]);
+ 	break;
++      case DEVICETYPE_SSD: /* SSD: */
++	return (struct device_header *)getssd(devicenos[c]);
++	break;
+       }
+     }
+   }
+@@ -144,14 +148,26 @@
+   bzero(disksim->deviceinfo->devicenames + c, zerocnt * sizeof(char *));
+ 
+   devicenos = realloc(devicenos, newlen*sizeof(int));
++#ifndef WIN32
+   bzero(devicenos + c, zerocnt * sizeof(int));
++#else
++  bzero(devicenos + c, zerocnt * sizeof(*(devicenos)));
++#endif
+ 
+   devicetypes = realloc(devicetypes, newlen*sizeof(int));
++#ifndef WIN32
+   bzero(devicetypes + c, zerocnt * sizeof(int));
++#else
++  bzero(devicetypes + c, zerocnt * sizeof(*(devicetypes)));
++#endif
+ 
+   disksim->deviceinfo->devices = realloc(disksim->deviceinfo->devices, 
+ 					 newlen*sizeof(int));
++#ifndef WIN32
+   bzero(disksim->deviceinfo->devices + c, zerocnt * sizeof(int));
++#else
++  bzero(disksim->deviceinfo->devices + c, zerocnt * sizeof(*(disksim->deviceinfo->devices)));
++#endif
+ 
+   disksim->deviceinfo->devs_len = newlen;
+ 
+@@ -204,6 +220,7 @@
+   disk_initialize ();
+   simpledisk_initialize ();
+   mems_initialize ();
++  ssd_initialize ();
+ }
+ 
+ void device_resetstats (void)
+@@ -212,6 +229,7 @@
+    disk_resetstats ();
+    simpledisk_resetstats ();
+    mems_resetstats ();
++   ssd_resetstats ();
+ }
+ 
+ 
+@@ -221,6 +239,7 @@
+    disk_printstats ();
+    simpledisk_printstats ();
+    mems_printstats ();
++   ssd_printstats ();
+ }
+ 
+ 
+@@ -251,6 +270,9 @@
+    case DEVICETYPE_MEMS:
+       mems_printsetstats (set, setsize, sourcestr);
+       break;
++   case DEVICETYPE_SSD:
++      ssd_printsetstats (set, setsize, sourcestr);
++      break;
+    default:
+       fprintf(stderr, "Unknown value for device type: devicetype %d\n", devicetype);
+       assert(0);
+diff -Naur disksim-4.0/src/disksim_device.h 4.0+ssd+Win/src/disksim_device.h
+--- disksim-4.0/src/disksim_device.h	2008-05-11 14:30:53.000000000 -0700
++++ 4.0+ssd+Win/src/disksim_device.h	2008-09-24 15:51:48.648400200 -0700
+@@ -66,6 +66,7 @@
+   DEVICETYPE_DISK	= 1,
+   DEVICETYPE_SIMPLEDISK	= 2,
+   DEVICETYPE_MEMS      = 3,
++  DEVICETYPE_SSD       = 4,
+ 
+   // this is something of a hack so that things like synthgen can
+   // refer to a logorg by name.  All we care here is that it has a
+diff -Naur disksim-4.0/src/disksim_diskctlr.c 4.0+ssd+Win/src/disksim_diskctlr.c
+--- disksim-4.0/src/disksim_diskctlr.c	2008-05-16 14:04:35.000000000 -0700
++++ 4.0+ssd+Win/src/disksim_diskctlr.c	2008-09-24 16:15:24.804400200 -0700
+@@ -3996,7 +3996,9 @@
+   struct dm_pbn pbn;
+   
+ 
++#ifndef WIN32
+   disksim_inst_enter();
++#endif
+ 
+   // first and last blocks on current track
+   int first, last;
+@@ -4042,12 +4044,13 @@
+ 
+   {
+     struct dm_pbn pbn;
++    // win32 moved for compilation
++    dm_ptol_result_t rv;
+     currdisk->model->layout->dm_translate_ltop(currdisk->model,
+ 					       curr->blkno,
+ 					       MAP_FULL,
+ 					       &pbn,
+ 					       NULL);
+-    dm_ptol_result_t rv;
+     rv = currdisk->model->layout->
+       dm_get_track_boundaries(currdisk->model, 
+ 			      &pbn,
+@@ -4136,9 +4139,15 @@
+   // used to have curr->blkno = first + trackstart here
+   // At the very minimum, slips will screw this up.
+   {
++#ifdef WIN32
++      struct dm_pbn tmppbn = { currdisk->mech_state.cyl,
++			     currdisk->mech_state.head,
++			     trackstart };
++#else
+     struct dm_pbn tmppbn = { .cyl = currdisk->mech_state.cyl,
+ 			     .head = currdisk->mech_state.head,
+ 			     .sector = trackstart };
++#endif
+     
+     curr->blkno = currdisk->model->layout->dm_translate_ptol(currdisk->model, &tmppbn, 0);
+     ddbg_assert(curr->blkno >= 0);
+@@ -4355,6 +4364,8 @@
+   disksim_inst_enter();
+ 
+   currdisk->fpcheck--;
++
++  /* Dushyanth: this seems to fire, so: */
+   ddbg_assert(currdisk->fpcheck); // see the comment in the header
+   
+   //  printf("%s %d %d\n", __func__, curr->blkno, curr->cause);
+diff -Naur disksim-4.0/src/disksim_global.h 4.0+ssd+Win/src/disksim_global.h
+--- disksim-4.0/src/disksim_global.h	2008-05-11 14:30:53.000000000 -0700
++++ 4.0+ssd+Win/src/disksim_global.h	2008-09-24 16:10:21.820400200 -0700
+@@ -219,6 +219,8 @@
+ #define EXIT_DISKSIM		124
+ #define MEMS_MIN_EVENT		200
+ #define MEMS_MAX_EVENT		220
++#define SSD_MIN_EVENT		300
++#define SSD_MAX_EVENT		320
+ 
+ /* Interrupt vector types */
+ 
+@@ -283,6 +285,8 @@
+    void  *tempptr2;
+    void  *mems_sled;	 /* mems sled associated with a particular event */
+    void  *mems_reqinfo; /* per-request info for mems subsystem */
++   int    ssd_elem_num;	 /* SSD: element to which this request went */
++   int    ssd_gang_num ; /* SSD: gang to which this request went */
+    double start_time;    /* temporary; used for memulator timing */
+    int    batchno;
+    int    batch_complete;
+@@ -406,6 +410,7 @@
+    struct disk_info *diskinfo;
+    struct simpledisk_info *simplediskinfo;
+    struct mems_info *memsinfo;
++   struct ssd_info *ssdinfo;  /* SSD: ssd specific plugin */
+    struct iodriver_info *iodriver_info;
+    struct businfo *businfo;
+    struct ctlrinfo *ctlrinfo;
+diff -Naur disksim-4.0/src/disksim_iosim.c 4.0+ssd+Win/src/disksim_iosim.c
+--- disksim-4.0/src/disksim_iosim.c	2008-05-11 14:30:54.000000000 -0700
++++ 4.0+ssd+Win/src/disksim_iosim.c	2008-09-24 15:49:06.610400200 -0700
+@@ -258,6 +258,8 @@
+    case MEMS_BUS_INITIATE:
+    case MEMS_BUS_TRANSFER:
+    case MEMS_BUS_UPDATE:
++   case SSD_CLEAN_ELEMENT:
++   case SSD_CLEAN_GANG:
+      device_event_arrive(curr);
+      break;
+ 
+diff -Naur disksim-4.0/src/disksim_iosim.h 4.0+ssd+Win/src/disksim_iosim.h
+--- disksim-4.0/src/disksim_iosim.h	2008-05-11 14:30:54.000000000 -0700
++++ 4.0+ssd+Win/src/disksim_iosim.h	2008-09-24 15:33:44.038400200 -0700
+@@ -153,6 +153,11 @@
+ #define MEMS_BUS_TRANSFER			207
+ #define MEMS_BUS_UPDATE			        208
+ 
++/* SSD: ssd event types -- keep this between SSD_MIN_EVENT and SSD_MAX_EVENT */
++
++#define SSD_CLEAN_ELEMENT		        301
++#define SSD_CLEAN_GANG			        302
++
+ /* I/O Interrupt cause types */
+ 
+ typedef enum {
+diff -Naur disksim-4.0/src/disksim_loadparams.c 4.0+ssd+Win/src/disksim_loadparams.c
+--- disksim-4.0/src/disksim_loadparams.c	2008-05-11 14:30:53.000000000 -0700
++++ 4.0+ssd+Win/src/disksim_loadparams.c	2008-09-24 15:29:10.662400200 -0700
+@@ -43,6 +43,8 @@
+ 
+ #include <diskmodel/modules/modules.h>
+ #include <memsmodel/modules/modules.h>
++/*SSD:*/
++#include <ssdmodel/modules/modules.h>
+ 
+ #include <stdio.h>
+ 
+@@ -75,6 +77,11 @@
+     lp_register_module(memsmodel_mods[c]);
+   }  
+ 
++  // ssdmodel modules
++  for(c = 0; c <= SSDMODEL_MAX_MODULE; c++) {
++    lp_register_module(ssdmodel_mods[c]);
++  }  
++
+   lp_register_topoloader(disksim_topoloader);
+ 
+   //  lp_init_typetbl();
+diff -Naur disksim-4.0/src/disksim_main.c 4.0+ssd+Win/src/disksim_main.c
+--- disksim-4.0/src/disksim_main.c	2008-05-11 14:30:53.000000000 -0700
++++ 4.0+ssd+Win/src/disksim_main.c	2008-05-23 18:44:06.000000000 -0700
+@@ -63,8 +63,10 @@
+   int len;
+ 
+ 
++#ifndef _WIN32
+   setlinebuf(stdout);
+   setlinebuf(stderr);
++#endif
+ 
+   if(argc == 2) {
+      disksim_restore_from_checkpoint (argv[1]);
+diff -Naur disksim-4.0/valid/runvalid 4.0+ssd+Win/valid/runvalid
+--- disksim-4.0/valid/runvalid	2008-06-23 13:20:02.000000000 -0700
++++ 4.0+ssd+Win/valid/runvalid	2008-08-18 14:41:59.984028300 -0700
+@@ -1,8 +1,12 @@
+ #!/bin/sh
+ 
++if [ "x${RUNVALID_PREFIX}" != "x" ];
++then
++PREFIX=${RUNVALID_PREFIX}
++else
+ PREFIX=../src
++fi
+ 
+-echo ""
+ echo "These results represent actual drive validation experiments"
+ 
+ echo ""
+diff -Naur disksim-4.0/w32build/deprecated/deprecated.c 4.0+ssd+Win/w32build/deprecated/deprecated.c
+--- disksim-4.0/w32build/deprecated/deprecated.c	1969-12-31 16:00:00.000000000 -0800
++++ 4.0+ssd+Win/w32build/deprecated/deprecated.c	2007-03-11 08:54:36.000000000 -0700
+@@ -0,0 +1,77 @@
++#include <string.h>
++#include <stdio.h>
++#include <stdarg.h>
++
++#define O_RDONLY _O_RDONLY
++
++char *strdup(char *s)
++{
++	return _strdup(s);
++}
++ 
++int strcasecmp(char *s1, char *s2)
++{
++	return _stricmp(s1, s2);
++}
++
++int read(int fd, void *buf, int bufsiz)
++{
++	return _read(fd, buf, bufsiz);
++}
++
++int write(int fd, void *buf, int bufsiz)
++{
++	return _write(fd, buf, bufsiz);
++}
++
++int dup(int fd)
++{
++	return _dup(fd);
++}
++
++int dup2(int fd1, int fd2)
++{
++	return _dup2(fd1, fd2);
++}
++
++int open(char *filename, int oflag)
++{
++	return _open(filename, oflag);
++}
++
++int close(int fd)
++{
++	return _close(fd);
++}
++
++
++void bzero(void *ptr, size_t size)
++{
++	memset(ptr,0,size);
++}
++
++#define max(x, y) (((x) > (y)) ? (x) : (y))
++
++/* We accept both forward and backward slash separators */
++/* strrchr returns NULL on no match, and NULL should be < any other pointer (???) */ 
++#define last_sep(path) max(path, 1+max(strrchr(path, '\\'), strrchr(path, '/')))
++
++	
++
++char *dirname(char *path)
++{
++	*(last_sep(path)) = '\0';
++	return path;
++}
++
++char *basename(char *path)
++{	
++	return last_sep(path);
++}
++
++int snprintf(char *str, int n, const char *format, ...)
++{
++	va_list args;
++	va_start(args, format);
++	return vsnprintf_s(str, n, _TRUNCATE, format, args);
++}
+diff -Naur disksim-4.0/w32build/deprecated/deprecated.vcproj 4.0+ssd+Win/w32build/deprecated/deprecated.vcproj
+--- disksim-4.0/w32build/deprecated/deprecated.vcproj	1969-12-31 16:00:00.000000000 -0800
++++ 4.0+ssd+Win/w32build/deprecated/deprecated.vcproj	2008-08-12 16:13:16.000000000 -0700
+@@ -0,0 +1,167 @@
++<?xml version="1.0" encoding="Windows-1252"?>
++<VisualStudioProject
++	ProjectType="Visual C++"
++	Version="8.00"
++	Name="deprecated"
++	ProjectGUID="{8FCBED79-CCFE-49EF-90EB-04D38CFE6DFF}"
++	RootNamespace="deprecated"
++	>
++	<Platforms>
++		<Platform
++			Name="Win32"
++		/>
++	</Platforms>
++	<ToolFiles>
++	</ToolFiles>
++	<Configurations>
++		<Configuration
++			Name="Debug|Win32"
++			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
++			IntermediateDirectory="$(ConfigurationName)"
++			ConfigurationType="4"
++			CharacterSet="2"
++			>
++			<Tool
++				Name="VCPreBuildEventTool"
++			/>
++			<Tool
++				Name="VCCustomBuildTool"
++			/>
++			<Tool
++				Name="VCXMLDataGeneratorTool"
++			/>
++			<Tool
++				Name="VCWebServiceProxyGeneratorTool"
++			/>
++			<Tool
++				Name="VCMIDLTool"
++			/>
++			<Tool
++				Name="VCCLCompilerTool"
++				Optimization="0"
++				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_DEPRECATE"
++				MinimalRebuild="true"
++				BasicRuntimeChecks="3"
++				RuntimeLibrary="3"
++				WarningLevel="1"
++				Detect64BitPortabilityProblems="true"
++				DebugInformationFormat="4"
++				CompileAs="1"
++			/>
++			<Tool
++				Name="VCManagedResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCPreLinkEventTool"
++			/>
++			<Tool
++				Name="VCLibrarianTool"
++			/>
++			<Tool
++				Name="VCALinkTool"
++			/>
++			<Tool
++				Name="VCXDCMakeTool"
++			/>
++			<Tool
++				Name="VCBscMakeTool"
++			/>
++			<Tool
++				Name="VCFxCopTool"
++			/>
++			<Tool
++				Name="VCPostBuildEventTool"
++			/>
++		</Configuration>
++		<Configuration
++			Name="Release|Win32"
++			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
++			IntermediateDirectory="$(ConfigurationName)"
++			ConfigurationType="1"
++			CharacterSet="2"
++			WholeProgramOptimization="1"
++			>
++			<Tool
++				Name="VCPreBuildEventTool"
++			/>
++			<Tool
++				Name="VCCustomBuildTool"
++			/>
++			<Tool
++				Name="VCXMLDataGeneratorTool"
++			/>
++			<Tool
++				Name="VCWebServiceProxyGeneratorTool"
++			/>
++			<Tool
++				Name="VCMIDLTool"
++			/>
++			<Tool
++				Name="VCCLCompilerTool"
++				RuntimeLibrary="2"
++				WarningLevel="3"
++				Detect64BitPortabilityProblems="true"
++				DebugInformationFormat="3"
++			/>
++			<Tool
++				Name="VCManagedResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCPreLinkEventTool"
++			/>
++			<Tool
++				Name="VCLinkerTool"
++				GenerateDebugInformation="true"
++				OptimizeReferences="2"
++				EnableCOMDATFolding="2"
++				TargetMachine="1"
++			/>
++			<Tool
++				Name="VCALinkTool"
++			/>
++			<Tool
++				Name="VCManifestTool"
++			/>
++			<Tool
++				Name="VCXDCMakeTool"
++			/>
++			<Tool
++				Name="VCBscMakeTool"
++			/>
++			<Tool
++				Name="VCFxCopTool"
++			/>
++			<Tool
++				Name="VCAppVerifierTool"
++			/>
++			<Tool
++				Name="VCWebDeploymentTool"
++			/>
++			<Tool
++				Name="VCPostBuildEventTool"
++			/>
++		</Configuration>
++	</Configurations>
++	<References>
++	</References>
++	<Files>
++		<Filter
++			Name="Source Files"
++			Filter="cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx"
++			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
++			>
++			<File
++				RelativePath=".\deprecated.c"
++				>
++			</File>
++		</Filter>
++	</Files>
++	<Globals>
++	</Globals>
++</VisualStudioProject>
+diff -Naur disksim-4.0/w32build/diskmodel/diskmodel.vcproj 4.0+ssd+Win/w32build/diskmodel/diskmodel.vcproj
+--- disksim-4.0/w32build/diskmodel/diskmodel.vcproj	1969-12-31 16:00:00.000000000 -0800
++++ 4.0+ssd+Win/w32build/diskmodel/diskmodel.vcproj	2008-08-12 16:13:14.000000000 -0700
+@@ -0,0 +1,331 @@
++<?xml version="1.0" encoding="Windows-1252"?>
++<VisualStudioProject
++	ProjectType="Visual C++"
++	Version="8.00"
++	Name="diskmodel"
++	ProjectGUID="{D161A777-BCA1-4665-8D59-E8F1DED596B7}"
++	RootNamespace="diskmodel"
++	Keyword="ManagedCProj"
++	>
++	<Platforms>
++		<Platform
++			Name="Win32"
++		/>
++	</Platforms>
++	<ToolFiles>
++	</ToolFiles>
++	<Configurations>
++		<Configuration
++			Name="Debug|Win32"
++			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
++			IntermediateDirectory="$(ConfigurationName)"
++			ConfigurationType="4"
++			CharacterSet="1"
++			ManagedExtensions="0"
++			>
++			<Tool
++				Name="VCPreBuildEventTool"
++			/>
++			<Tool
++				Name="VCCustomBuildTool"
++			/>
++			<Tool
++				Name="VCXMLDataGeneratorTool"
++			/>
++			<Tool
++				Name="VCWebServiceProxyGeneratorTool"
++			/>
++			<Tool
++				Name="VCMIDLTool"
++			/>
++			<Tool
++				Name="VCCLCompilerTool"
++				Optimization="0"
++				AdditionalIncludeDirectories="..\..;..\..\diskmodel"
++				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_DEPRECATE;_DM_SOURCE"
++				IgnoreStandardIncludePath="false"
++				RuntimeLibrary="3"
++				DisableLanguageExtensions="true"
++				UsePrecompiledHeader="0"
++				WarningLevel="1"
++				Detect64BitPortabilityProblems="true"
++				DebugInformationFormat="3"
++				CompileAs="1"
++			/>
++			<Tool
++				Name="VCManagedResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCPreLinkEventTool"
++			/>
++			<Tool
++				Name="VCLibrarianTool"
++			/>
++			<Tool
++				Name="VCALinkTool"
++			/>
++			<Tool
++				Name="VCXDCMakeTool"
++			/>
++			<Tool
++				Name="VCBscMakeTool"
++			/>
++			<Tool
++				Name="VCFxCopTool"
++			/>
++			<Tool
++				Name="VCPostBuildEventTool"
++			/>
++		</Configuration>
++		<Configuration
++			Name="Release|Win32"
++			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
++			IntermediateDirectory="$(ConfigurationName)"
++			ConfigurationType="2"
++			CharacterSet="1"
++			ManagedExtensions="1"
++			WholeProgramOptimization="1"
++			>
++			<Tool
++				Name="VCPreBuildEventTool"
++			/>
++			<Tool
++				Name="VCCustomBuildTool"
++			/>
++			<Tool
++				Name="VCXMLDataGeneratorTool"
++			/>
++			<Tool
++				Name="VCWebServiceProxyGeneratorTool"
++			/>
++			<Tool
++				Name="VCMIDLTool"
++			/>
++			<Tool
++				Name="VCCLCompilerTool"
++				PreprocessorDefinitions="WIN32;NDEBUG"
++				RuntimeLibrary="2"
++				UsePrecompiledHeader="2"
++				WarningLevel="3"
++				DebugInformationFormat="3"
++			/>
++			<Tool
++				Name="VCManagedResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCPreLinkEventTool"
++			/>
++			<Tool
++				Name="VCLinkerTool"
++				AdditionalDependencies="$(NoInherit)"
++				LinkIncremental="1"
++				GenerateDebugInformation="true"
++				TargetMachine="1"
++			/>
++			<Tool
++				Name="VCALinkTool"
++			/>
++			<Tool
++				Name="VCManifestTool"
++			/>
++			<Tool
++				Name="VCXDCMakeTool"
++			/>
++			<Tool
++				Name="VCBscMakeTool"
++			/>
++			<Tool
++				Name="VCFxCopTool"
++			/>
++			<Tool
++				Name="VCAppVerifierTool"
++			/>
++			<Tool
++				Name="VCWebDeploymentTool"
++			/>
++			<Tool
++				Name="VCPostBuildEventTool"
++			/>
++		</Configuration>
++	</Configurations>
++	<References>
++	</References>
++	<Files>
++		<Filter
++			Name="Source Files"
++			Filter="cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx"
++			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
++			>
++			<File
++				RelativePath="..\..\diskmodel\convert.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\modules\dm_disk_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\modules\dm_layout_g1_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\modules\dm_layout_g1_zone_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\modules\dm_layout_g2_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\modules\dm_layout_g2_zone_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\modules\dm_layout_g4_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\dm_load.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\modules\dm_mech_g1_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\layout_g1.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\layout_g1_load.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\layout_g2.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\layout_g2_load.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\layout_g4.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\layout_g4_load.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\marshal.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\mech_g1.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\mech_g1_load.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\mech_g1_seektime.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\pbn.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\sqrt.c"
++				>
++			</File>
++		</Filter>
++		<Filter
++			Name="Header Files"
++			Filter="h;hpp;hxx;hm;inl;inc;xsd"
++			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
++			>
++			<File
++				RelativePath="..\..\diskmodel\dm.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\dm_config.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\modules\dm_disk_param.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\modules\dm_layout_g1_param.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\modules\dm_layout_g1_zone_param.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\modules\dm_layout_g2_param.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\modules\dm_layout_g2_zone_param.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\modules\dm_layout_g4_param.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\modules\dm_mech_g1_param.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\dm_types.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\layout_g1.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\layout_g2.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\layout_g4.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\layout_g4_private.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\marshal.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\mech_g1.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\mech_g1_private.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\diskmodel\modules\modules.h"
++				>
++			</File>
++		</Filter>
++	</Files>
++	<Globals>
++	</Globals>
++</VisualStudioProject>
+diff -Naur disksim-4.0/w32build/disksim.sln 4.0+ssd+Win/w32build/disksim.sln
+--- disksim-4.0/w32build/disksim.sln	1969-12-31 16:00:00.000000000 -0800
++++ 4.0+ssd+Win/w32build/disksim.sln	2008-08-16 13:28:54.000000000 -0700
+@@ -0,0 +1,217 @@
++﻿
++Microsoft Visual Studio Solution File, Format Version 9.00
++# Visual Studio 2005
++Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "disksim", "disksim.vcproj", "{35E89F93-7D26-489B-821E-D562B60D59B0}"
++	ProjectSection(WebsiteProperties) = preProject
++		Debug.AspNetCompiler.Debug = "True"
++		Release.AspNetCompiler.Debug = "False"
++	EndProjectSection
++	ProjectSection(ProjectDependencies) = postProject
++		{8FCBED79-CCFE-49EF-90EB-04D38CFE6DFF} = {8FCBED79-CCFE-49EF-90EB-04D38CFE6DFF}
++		{18591E37-0658-4D76-839C-41FAC9806832} = {18591E37-0658-4D76-839C-41FAC9806832}
++		{94C48629-B43B-456F-A1F8-9C24906BF27E} = {94C48629-B43B-456F-A1F8-9C24906BF27E}
++	EndProjectSection
++EndProject
++Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "dbglib", "libdbg\libdbg.vcproj", "{B90D194E-8664-487C-A1FE-F1CA0B03B169}"
++	ProjectSection(WebsiteProperties) = preProject
++		Debug.AspNetCompiler.Debug = "True"
++		Release.AspNetCompiler.Debug = "False"
++	EndProjectSection
++EndProject
++Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "diskmodel", "diskmodel\diskmodel.vcproj", "{D161A777-BCA1-4665-8D59-E8F1DED596B7}"
++	ProjectSection(WebsiteProperties) = preProject
++		Debug.AspNetCompiler.Debug = "True"
++		Release.AspNetCompiler.Debug = "False"
++	EndProjectSection
++	ProjectSection(ProjectDependencies) = postProject
++		{B90D194E-8664-487C-A1FE-F1CA0B03B169} = {B90D194E-8664-487C-A1FE-F1CA0B03B169}
++	EndProjectSection
++EndProject
++Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "memsmodel", "memsmodel\memsmodel.vcproj", "{A6B73867-260A-4BE7-9A0E-38E21E514903}"
++	ProjectSection(WebsiteProperties) = preProject
++		Debug.AspNetCompiler.Debug = "True"
++		Release.AspNetCompiler.Debug = "False"
++	EndProjectSection
++EndProject
++Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libparam", "libparam\libparam.vcproj", "{B4BCA8C3-D980-42EF-B24B-3C40ABDEF9B4}"
++	ProjectSection(WebsiteProperties) = preProject
++		Debug.AspNetCompiler.Debug = "True"
++		Release.AspNetCompiler.Debug = "False"
++	EndProjectSection
++EndProject
++Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "rms", "rms\rms.vcproj", "{535D85D5-092E-4B94-943F-1E96280F323E}"
++	ProjectSection(WebsiteProperties) = preProject
++		Debug.AspNetCompiler.Debug = "True"
++		Release.AspNetCompiler.Debug = "False"
++	EndProjectSection
++EndProject
++Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "syssim", "syssim\syssim.vcproj", "{4F0A9C7F-695A-4BE2-96EA-9941F66334EE}"
++	ProjectSection(WebsiteProperties) = preProject
++		Debug.AspNetCompiler.Debug = "True"
++		Release.AspNetCompiler.Debug = "False"
++	EndProjectSection
++	ProjectSection(ProjectDependencies) = postProject
++		{B4BCA8C3-D980-42EF-B24B-3C40ABDEF9B4} = {B4BCA8C3-D980-42EF-B24B-3C40ABDEF9B4}
++		{D161A777-BCA1-4665-8D59-E8F1DED596B7} = {D161A777-BCA1-4665-8D59-E8F1DED596B7}
++		{A6B73867-260A-4BE7-9A0E-38E21E514903} = {A6B73867-260A-4BE7-9A0E-38E21E514903}
++		{B90D194E-8664-487C-A1FE-F1CA0B03B169} = {B90D194E-8664-487C-A1FE-F1CA0B03B169}
++	EndProjectSection
++EndProject
++Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "disksimlib", "disksimlib\disksimlib.vcproj", "{18591E37-0658-4D76-839C-41FAC9806832}"
++	ProjectSection(WebsiteProperties) = preProject
++		Debug.AspNetCompiler.Debug = "True"
++		Release.AspNetCompiler.Debug = "False"
++	EndProjectSection
++	ProjectSection(ProjectDependencies) = postProject
++		{94C48629-B43B-456F-A1F8-9C24906BF27E} = {94C48629-B43B-456F-A1F8-9C24906BF27E}
++	EndProjectSection
++EndProject
++Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "deprecated", "deprecated\deprecated.vcproj", "{8FCBED79-CCFE-49EF-90EB-04D38CFE6DFF}"
++	ProjectSection(WebsiteProperties) = preProject
++		Debug.AspNetCompiler.Debug = "True"
++		Release.AspNetCompiler.Debug = "False"
++	EndProjectSection
++EndProject
++Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ssdmodel", "ssdmodel\ssdmodel.vcproj", "{94C48629-B43B-456F-A1F8-9C24906BF27E}"
++	ProjectSection(WebsiteProperties) = preProject
++		Debug.AspNetCompiler.Debug = "True"
++		Release.AspNetCompiler.Debug = "False"
++	EndProjectSection
++EndProject
++Global
++	GlobalSection(SolutionConfigurationPlatforms) = preSolution
++		Debug|Any CPU = Debug|Any CPU
++		Debug|Mixed Platforms = Debug|Mixed Platforms
++		Debug|Win32 = Debug|Win32
++		Debug|x64 = Debug|x64
++		Release|Any CPU = Release|Any CPU
++		Release|Mixed Platforms = Release|Mixed Platforms
++		Release|Win32 = Release|Win32
++		Release|x64 = Release|x64
++	EndGlobalSection
++	GlobalSection(ProjectConfigurationPlatforms) = postSolution
++		{35E89F93-7D26-489B-821E-D562B60D59B0}.Debug|Any CPU.ActiveCfg = Debug|Win32
++		{35E89F93-7D26-489B-821E-D562B60D59B0}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
++		{35E89F93-7D26-489B-821E-D562B60D59B0}.Debug|Mixed Platforms.Build.0 = Debug|Win32
++		{35E89F93-7D26-489B-821E-D562B60D59B0}.Debug|Win32.ActiveCfg = Debug|Win32
++		{35E89F93-7D26-489B-821E-D562B60D59B0}.Debug|Win32.Build.0 = Debug|Win32
++		{35E89F93-7D26-489B-821E-D562B60D59B0}.Debug|x64.ActiveCfg = Debug|Win32
++		{35E89F93-7D26-489B-821E-D562B60D59B0}.Release|Any CPU.ActiveCfg = Release|Win32
++		{35E89F93-7D26-489B-821E-D562B60D59B0}.Release|Mixed Platforms.ActiveCfg = Release|Win32
++		{35E89F93-7D26-489B-821E-D562B60D59B0}.Release|Mixed Platforms.Build.0 = Release|Win32
++		{35E89F93-7D26-489B-821E-D562B60D59B0}.Release|Win32.ActiveCfg = Release|Win32
++		{35E89F93-7D26-489B-821E-D562B60D59B0}.Release|Win32.Build.0 = Release|Win32
++		{35E89F93-7D26-489B-821E-D562B60D59B0}.Release|x64.ActiveCfg = Release|Win32
++		{B90D194E-8664-487C-A1FE-F1CA0B03B169}.Debug|Any CPU.ActiveCfg = Debug|Win32
++		{B90D194E-8664-487C-A1FE-F1CA0B03B169}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
++		{B90D194E-8664-487C-A1FE-F1CA0B03B169}.Debug|Mixed Platforms.Build.0 = Debug|Win32
++		{B90D194E-8664-487C-A1FE-F1CA0B03B169}.Debug|Win32.ActiveCfg = Debug|Win32
++		{B90D194E-8664-487C-A1FE-F1CA0B03B169}.Debug|Win32.Build.0 = Debug|Win32
++		{B90D194E-8664-487C-A1FE-F1CA0B03B169}.Debug|x64.ActiveCfg = Debug|Win32
++		{B90D194E-8664-487C-A1FE-F1CA0B03B169}.Release|Any CPU.ActiveCfg = Release|Win32
++		{B90D194E-8664-487C-A1FE-F1CA0B03B169}.Release|Mixed Platforms.ActiveCfg = Release|Win32
++		{B90D194E-8664-487C-A1FE-F1CA0B03B169}.Release|Mixed Platforms.Build.0 = Release|Win32
++		{B90D194E-8664-487C-A1FE-F1CA0B03B169}.Release|Win32.ActiveCfg = Release|Win32
++		{B90D194E-8664-487C-A1FE-F1CA0B03B169}.Release|Win32.Build.0 = Release|Win32
++		{B90D194E-8664-487C-A1FE-F1CA0B03B169}.Release|x64.ActiveCfg = Release|Win32
++		{D161A777-BCA1-4665-8D59-E8F1DED596B7}.Debug|Any CPU.ActiveCfg = Debug|Win32
++		{D161A777-BCA1-4665-8D59-E8F1DED596B7}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
++		{D161A777-BCA1-4665-8D59-E8F1DED596B7}.Debug|Mixed Platforms.Build.0 = Debug|Win32
++		{D161A777-BCA1-4665-8D59-E8F1DED596B7}.Debug|Win32.ActiveCfg = Debug|Win32
++		{D161A777-BCA1-4665-8D59-E8F1DED596B7}.Debug|Win32.Build.0 = Debug|Win32
++		{D161A777-BCA1-4665-8D59-E8F1DED596B7}.Debug|x64.ActiveCfg = Debug|Win32
++		{D161A777-BCA1-4665-8D59-E8F1DED596B7}.Release|Any CPU.ActiveCfg = Release|Win32
++		{D161A777-BCA1-4665-8D59-E8F1DED596B7}.Release|Mixed Platforms.ActiveCfg = Release|Win32
++		{D161A777-BCA1-4665-8D59-E8F1DED596B7}.Release|Mixed Platforms.Build.0 = Release|Win32
++		{D161A777-BCA1-4665-8D59-E8F1DED596B7}.Release|Win32.ActiveCfg = Release|Win32
++		{D161A777-BCA1-4665-8D59-E8F1DED596B7}.Release|Win32.Build.0 = Release|Win32
++		{D161A777-BCA1-4665-8D59-E8F1DED596B7}.Release|x64.ActiveCfg = Release|Win32
++		{A6B73867-260A-4BE7-9A0E-38E21E514903}.Debug|Any CPU.ActiveCfg = Debug|Win32
++		{A6B73867-260A-4BE7-9A0E-38E21E514903}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
++		{A6B73867-260A-4BE7-9A0E-38E21E514903}.Debug|Mixed Platforms.Build.0 = Debug|Win32
++		{A6B73867-260A-4BE7-9A0E-38E21E514903}.Debug|Win32.ActiveCfg = Debug|Win32
++		{A6B73867-260A-4BE7-9A0E-38E21E514903}.Debug|Win32.Build.0 = Debug|Win32
++		{A6B73867-260A-4BE7-9A0E-38E21E514903}.Debug|x64.ActiveCfg = Debug|Win32
++		{A6B73867-260A-4BE7-9A0E-38E21E514903}.Release|Any CPU.ActiveCfg = Release|Win32
++		{A6B73867-260A-4BE7-9A0E-38E21E514903}.Release|Mixed Platforms.ActiveCfg = Release|Win32
++		{A6B73867-260A-4BE7-9A0E-38E21E514903}.Release|Mixed Platforms.Build.0 = Release|Win32
++		{A6B73867-260A-4BE7-9A0E-38E21E514903}.Release|Win32.ActiveCfg = Release|Win32
++		{A6B73867-260A-4BE7-9A0E-38E21E514903}.Release|Win32.Build.0 = Release|Win32
++		{A6B73867-260A-4BE7-9A0E-38E21E514903}.Release|x64.ActiveCfg = Release|Win32
++		{B4BCA8C3-D980-42EF-B24B-3C40ABDEF9B4}.Debug|Any CPU.ActiveCfg = Debug|Win32
++		{B4BCA8C3-D980-42EF-B24B-3C40ABDEF9B4}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
++		{B4BCA8C3-D980-42EF-B24B-3C40ABDEF9B4}.Debug|Mixed Platforms.Build.0 = Debug|Win32
++		{B4BCA8C3-D980-42EF-B24B-3C40ABDEF9B4}.Debug|Win32.ActiveCfg = Debug|Win32
++		{B4BCA8C3-D980-42EF-B24B-3C40ABDEF9B4}.Debug|Win32.Build.0 = Debug|Win32
++		{B4BCA8C3-D980-42EF-B24B-3C40ABDEF9B4}.Debug|x64.ActiveCfg = Debug|Win32
++		{B4BCA8C3-D980-42EF-B24B-3C40ABDEF9B4}.Release|Any CPU.ActiveCfg = Release|Win32
++		{B4BCA8C3-D980-42EF-B24B-3C40ABDEF9B4}.Release|Mixed Platforms.ActiveCfg = Release|Win32
++		{B4BCA8C3-D980-42EF-B24B-3C40ABDEF9B4}.Release|Mixed Platforms.Build.0 = Release|Win32
++		{B4BCA8C3-D980-42EF-B24B-3C40ABDEF9B4}.Release|Win32.ActiveCfg = Release|Win32
++		{B4BCA8C3-D980-42EF-B24B-3C40ABDEF9B4}.Release|Win32.Build.0 = Release|Win32
++		{B4BCA8C3-D980-42EF-B24B-3C40ABDEF9B4}.Release|x64.ActiveCfg = Release|Win32
++		{535D85D5-092E-4B94-943F-1E96280F323E}.Debug|Any CPU.ActiveCfg = Debug|Win32
++		{535D85D5-092E-4B94-943F-1E96280F323E}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
++		{535D85D5-092E-4B94-943F-1E96280F323E}.Debug|Mixed Platforms.Build.0 = Debug|Win32
++		{535D85D5-092E-4B94-943F-1E96280F323E}.Debug|Win32.ActiveCfg = Debug|Win32
++		{535D85D5-092E-4B94-943F-1E96280F323E}.Debug|Win32.Build.0 = Debug|Win32
++		{535D85D5-092E-4B94-943F-1E96280F323E}.Debug|x64.ActiveCfg = Debug|Win32
++		{535D85D5-092E-4B94-943F-1E96280F323E}.Release|Any CPU.ActiveCfg = Release|Win32
++		{535D85D5-092E-4B94-943F-1E96280F323E}.Release|Mixed Platforms.ActiveCfg = Release|Win32
++		{535D85D5-092E-4B94-943F-1E96280F323E}.Release|Mixed Platforms.Build.0 = Release|Win32
++		{535D85D5-092E-4B94-943F-1E96280F323E}.Release|Win32.ActiveCfg = Release|Win32
++		{535D85D5-092E-4B94-943F-1E96280F323E}.Release|Win32.Build.0 = Release|Win32
++		{535D85D5-092E-4B94-943F-1E96280F323E}.Release|x64.ActiveCfg = Release|Win32
++		{4F0A9C7F-695A-4BE2-96EA-9941F66334EE}.Debug|Any CPU.ActiveCfg = Debug|Win32
++		{4F0A9C7F-695A-4BE2-96EA-9941F66334EE}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
++		{4F0A9C7F-695A-4BE2-96EA-9941F66334EE}.Debug|Mixed Platforms.Build.0 = Debug|Win32
++		{4F0A9C7F-695A-4BE2-96EA-9941F66334EE}.Debug|Win32.ActiveCfg = Debug|Win32
++		{4F0A9C7F-695A-4BE2-96EA-9941F66334EE}.Debug|Win32.Build.0 = Debug|Win32
++		{4F0A9C7F-695A-4BE2-96EA-9941F66334EE}.Debug|x64.ActiveCfg = Debug|Win32
++		{4F0A9C7F-695A-4BE2-96EA-9941F66334EE}.Release|Any CPU.ActiveCfg = Release|Win32
++		{4F0A9C7F-695A-4BE2-96EA-9941F66334EE}.Release|Mixed Platforms.ActiveCfg = Release|Win32
++		{4F0A9C7F-695A-4BE2-96EA-9941F66334EE}.Release|Mixed Platforms.Build.0 = Release|Win32
++		{4F0A9C7F-695A-4BE2-96EA-9941F66334EE}.Release|Win32.ActiveCfg = Release|Win32
++		{4F0A9C7F-695A-4BE2-96EA-9941F66334EE}.Release|Win32.Build.0 = Release|Win32
++		{4F0A9C7F-695A-4BE2-96EA-9941F66334EE}.Release|x64.ActiveCfg = Release|Win32
++		{18591E37-0658-4D76-839C-41FAC9806832}.Debug|Any CPU.ActiveCfg = Debug|Win32
++		{18591E37-0658-4D76-839C-41FAC9806832}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
++		{18591E37-0658-4D76-839C-41FAC9806832}.Debug|Mixed Platforms.Build.0 = Debug|Win32
++		{18591E37-0658-4D76-839C-41FAC9806832}.Debug|Win32.ActiveCfg = Debug|Win32
++		{18591E37-0658-4D76-839C-41FAC9806832}.Debug|Win32.Build.0 = Debug|Win32
++		{18591E37-0658-4D76-839C-41FAC9806832}.Debug|x64.ActiveCfg = Debug|Win32
++		{18591E37-0658-4D76-839C-41FAC9806832}.Release|Any CPU.ActiveCfg = Release|Win32
++		{18591E37-0658-4D76-839C-41FAC9806832}.Release|Mixed Platforms.ActiveCfg = Release|Win32
++		{18591E37-0658-4D76-839C-41FAC9806832}.Release|Mixed Platforms.Build.0 = Release|Win32
++		{18591E37-0658-4D76-839C-41FAC9806832}.Release|Win32.ActiveCfg = Release|Win32
++		{18591E37-0658-4D76-839C-41FAC9806832}.Release|Win32.Build.0 = Release|Win32
++		{18591E37-0658-4D76-839C-41FAC9806832}.Release|x64.ActiveCfg = Release|Win32
++		{8FCBED79-CCFE-49EF-90EB-04D38CFE6DFF}.Debug|Any CPU.ActiveCfg = Debug|Win32
++		{8FCBED79-CCFE-49EF-90EB-04D38CFE6DFF}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
++		{8FCBED79-CCFE-49EF-90EB-04D38CFE6DFF}.Debug|Mixed Platforms.Build.0 = Debug|Win32
++		{8FCBED79-CCFE-49EF-90EB-04D38CFE6DFF}.Debug|Win32.ActiveCfg = Debug|Win32
++		{8FCBED79-CCFE-49EF-90EB-04D38CFE6DFF}.Debug|Win32.Build.0 = Debug|Win32
++		{8FCBED79-CCFE-49EF-90EB-04D38CFE6DFF}.Debug|x64.ActiveCfg = Debug|Win32
++		{8FCBED79-CCFE-49EF-90EB-04D38CFE6DFF}.Release|Any CPU.ActiveCfg = Release|Win32
++		{8FCBED79-CCFE-49EF-90EB-04D38CFE6DFF}.Release|Mixed Platforms.ActiveCfg = Release|Win32
++		{8FCBED79-CCFE-49EF-90EB-04D38CFE6DFF}.Release|Mixed Platforms.Build.0 = Release|Win32
++		{8FCBED79-CCFE-49EF-90EB-04D38CFE6DFF}.Release|Win32.ActiveCfg = Release|Win32
++		{8FCBED79-CCFE-49EF-90EB-04D38CFE6DFF}.Release|Win32.Build.0 = Release|Win32
++		{8FCBED79-CCFE-49EF-90EB-04D38CFE6DFF}.Release|x64.ActiveCfg = Release|Win32
++		{94C48629-B43B-456F-A1F8-9C24906BF27E}.Debug|Any CPU.ActiveCfg = Debug|Win32
++		{94C48629-B43B-456F-A1F8-9C24906BF27E}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
++		{94C48629-B43B-456F-A1F8-9C24906BF27E}.Debug|Mixed Platforms.Build.0 = Debug|Win32
++		{94C48629-B43B-456F-A1F8-9C24906BF27E}.Debug|Win32.ActiveCfg = Debug|Win32
++		{94C48629-B43B-456F-A1F8-9C24906BF27E}.Debug|Win32.Build.0 = Debug|Win32
++		{94C48629-B43B-456F-A1F8-9C24906BF27E}.Debug|x64.ActiveCfg = Debug|Win32
++		{94C48629-B43B-456F-A1F8-9C24906BF27E}.Release|Any CPU.ActiveCfg = Release|Win32
++		{94C48629-B43B-456F-A1F8-9C24906BF27E}.Release|Mixed Platforms.ActiveCfg = Release|Win32
++		{94C48629-B43B-456F-A1F8-9C24906BF27E}.Release|Mixed Platforms.Build.0 = Release|Win32
++		{94C48629-B43B-456F-A1F8-9C24906BF27E}.Release|Win32.ActiveCfg = Release|Win32
++		{94C48629-B43B-456F-A1F8-9C24906BF27E}.Release|Win32.Build.0 = Release|Win32
++		{94C48629-B43B-456F-A1F8-9C24906BF27E}.Release|x64.ActiveCfg = Release|Win32
++	EndGlobalSection
++	GlobalSection(SolutionProperties) = preSolution
++		HideSolutionNode = FALSE
++	EndGlobalSection
++EndGlobal
+diff -Naur disksim-4.0/w32build/disksim.vcproj 4.0+ssd+Win/w32build/disksim.vcproj
+--- disksim-4.0/w32build/disksim.vcproj	1969-12-31 16:00:00.000000000 -0800
++++ 4.0+ssd+Win/w32build/disksim.vcproj	2008-08-12 16:13:14.000000000 -0700
+@@ -0,0 +1,203 @@
++<?xml version="1.0" encoding="Windows-1252"?>
++<VisualStudioProject
++	ProjectType="Visual C++"
++	Version="8.00"
++	Name="disksim"
++	ProjectGUID="{35E89F93-7D26-489B-821E-D562B60D59B0}"
++	RootNamespace="disksim"
++	Keyword="Win32Proj"
++	>
++	<Platforms>
++		<Platform
++			Name="Win32"
++		/>
++	</Platforms>
++	<ToolFiles>
++	</ToolFiles>
++	<Configurations>
++		<Configuration
++			Name="Debug|Win32"
++			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
++			IntermediateDirectory="$(ConfigurationName)"
++			ConfigurationType="1"
++			CharacterSet="1"
++			>
++			<Tool
++				Name="VCPreBuildEventTool"
++			/>
++			<Tool
++				Name="VCCustomBuildTool"
++			/>
++			<Tool
++				Name="VCXMLDataGeneratorTool"
++			/>
++			<Tool
++				Name="VCWebServiceProxyGeneratorTool"
++			/>
++			<Tool
++				Name="VCMIDLTool"
++			/>
++			<Tool
++				Name="VCCLCompilerTool"
++				Optimization="0"
++				AdditionalIncludeDirectories="..;..\src"
++				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_DEPRECATE"
++				MinimalRebuild="true"
++				BasicRuntimeChecks="3"
++				RuntimeLibrary="3"
++				UsePrecompiledHeader="0"
++				WarningLevel="1"
++				Detect64BitPortabilityProblems="true"
++				DebugInformationFormat="4"
++				CompileAs="1"
++			/>
++			<Tool
++				Name="VCManagedResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCPreLinkEventTool"
++			/>
++			<Tool
++				Name="VCLinkerTool"
++				LinkIncremental="2"
++				GenerateDebugInformation="true"
++				SubSystem="1"
++				TargetMachine="1"
++			/>
++			<Tool
++				Name="VCALinkTool"
++			/>
++			<Tool
++				Name="VCManifestTool"
++			/>
++			<Tool
++				Name="VCXDCMakeTool"
++			/>
++			<Tool
++				Name="VCBscMakeTool"
++			/>
++			<Tool
++				Name="VCFxCopTool"
++			/>
++			<Tool
++				Name="VCAppVerifierTool"
++			/>
++			<Tool
++				Name="VCWebDeploymentTool"
++			/>
++			<Tool
++				Name="VCPostBuildEventTool"
++			/>
++		</Configuration>
++		<Configuration
++			Name="Release|Win32"
++			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
++			IntermediateDirectory="$(ConfigurationName)"
++			ConfigurationType="1"
++			CharacterSet="1"
++			WholeProgramOptimization="1"
++			>
++			<Tool
++				Name="VCPreBuildEventTool"
++			/>
++			<Tool
++				Name="VCCustomBuildTool"
++			/>
++			<Tool
++				Name="VCXMLDataGeneratorTool"
++			/>
++			<Tool
++				Name="VCWebServiceProxyGeneratorTool"
++			/>
++			<Tool
++				Name="VCMIDLTool"
++			/>
++			<Tool
++				Name="VCCLCompilerTool"
++				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
++				RuntimeLibrary="2"
++				UsePrecompiledHeader="2"
++				WarningLevel="3"
++				Detect64BitPortabilityProblems="true"
++				DebugInformationFormat="3"
++			/>
++			<Tool
++				Name="VCManagedResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCPreLinkEventTool"
++			/>
++			<Tool
++				Name="VCLinkerTool"
++				LinkIncremental="1"
++				GenerateDebugInformation="true"
++				SubSystem="1"
++				OptimizeReferences="2"
++				EnableCOMDATFolding="2"
++				TargetMachine="1"
++			/>
++			<Tool
++				Name="VCALinkTool"
++			/>
++			<Tool
++				Name="VCManifestTool"
++			/>
++			<Tool
++				Name="VCXDCMakeTool"
++			/>
++			<Tool
++				Name="VCBscMakeTool"
++			/>
++			<Tool
++				Name="VCFxCopTool"
++			/>
++			<Tool
++				Name="VCAppVerifierTool"
++			/>
++			<Tool
++				Name="VCWebDeploymentTool"
++			/>
++			<Tool
++				Name="VCPostBuildEventTool"
++			/>
++		</Configuration>
++	</Configurations>
++	<References>
++		<ProjectReference
++			ReferencedProjectIdentifier="{B90D194E-8664-487C-A1FE-F1CA0B03B169}"
++			RelativePathToProject=".\libdbg\libdbg.vcproj"
++		/>
++		<ProjectReference
++			ReferencedProjectIdentifier="{D161A777-BCA1-4665-8D59-E8F1DED596B7}"
++			RelativePathToProject=".\diskmodel\diskmodel.vcproj"
++		/>
++		<ProjectReference
++			ReferencedProjectIdentifier="{A6B73867-260A-4BE7-9A0E-38E21E514903}"
++			RelativePathToProject=".\memsmodel\memsmodel.vcproj"
++		/>
++		<ProjectReference
++			ReferencedProjectIdentifier="{B4BCA8C3-D980-42EF-B24B-3C40ABDEF9B4}"
++			RelativePathToProject=".\libparam\libparam.vcproj"
++		/>
++	</References>
++	<Files>
++		<Filter
++			Name="Source Files"
++			Filter="cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx"
++			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
++			>
++			<File
++				RelativePath="..\src\disksim.c"
++				>
++			</File>
++		</Filter>
++	</Files>
++	<Globals>
++	</Globals>
++</VisualStudioProject>
+diff -Naur disksim-4.0/w32build/disksimlib/disksimlib.vcproj 4.0+ssd+Win/w32build/disksimlib/disksimlib.vcproj
+--- disksim-4.0/w32build/disksimlib/disksimlib.vcproj	1969-12-31 16:00:00.000000000 -0800
++++ 4.0+ssd+Win/w32build/disksimlib/disksimlib.vcproj	2008-08-12 16:13:14.000000000 -0700
+@@ -0,0 +1,530 @@
++<?xml version="1.0" encoding="Windows-1252"?>
++<VisualStudioProject
++	ProjectType="Visual C++"
++	Version="8.00"
++	Name="disksimlib"
++	ProjectGUID="{18591E37-0658-4D76-839C-41FAC9806832}"
++	RootNamespace="disksimlib"
++	>
++	<Platforms>
++		<Platform
++			Name="Win32"
++		/>
++	</Platforms>
++	<ToolFiles>
++	</ToolFiles>
++	<Configurations>
++		<Configuration
++			Name="Debug|Win32"
++			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
++			IntermediateDirectory="$(ConfigurationName)"
++			ConfigurationType="4"
++			CharacterSet="2"
++			>
++			<Tool
++				Name="VCPreBuildEventTool"
++			/>
++			<Tool
++				Name="VCCustomBuildTool"
++			/>
++			<Tool
++				Name="VCXMLDataGeneratorTool"
++			/>
++			<Tool
++				Name="VCWebServiceProxyGeneratorTool"
++			/>
++			<Tool
++				Name="VCMIDLTool"
++			/>
++			<Tool
++				Name="VCCLCompilerTool"
++				Optimization="0"
++				AdditionalIncludeDirectories="..\..;..\..\src"
++				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_DEPRECATE"
++				MinimalRebuild="true"
++				BasicRuntimeChecks="3"
++				RuntimeLibrary="3"
++				WarningLevel="1"
++				Detect64BitPortabilityProblems="true"
++				DebugInformationFormat="4"
++				CompileAs="1"
++			/>
++			<Tool
++				Name="VCManagedResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCPreLinkEventTool"
++			/>
++			<Tool
++				Name="VCLibrarianTool"
++			/>
++			<Tool
++				Name="VCALinkTool"
++			/>
++			<Tool
++				Name="VCXDCMakeTool"
++			/>
++			<Tool
++				Name="VCBscMakeTool"
++			/>
++			<Tool
++				Name="VCFxCopTool"
++			/>
++			<Tool
++				Name="VCPostBuildEventTool"
++			/>
++		</Configuration>
++		<Configuration
++			Name="Release|Win32"
++			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
++			IntermediateDirectory="$(ConfigurationName)"
++			ConfigurationType="1"
++			CharacterSet="2"
++			WholeProgramOptimization="1"
++			>
++			<Tool
++				Name="VCPreBuildEventTool"
++			/>
++			<Tool
++				Name="VCCustomBuildTool"
++			/>
++			<Tool
++				Name="VCXMLDataGeneratorTool"
++			/>
++			<Tool
++				Name="VCWebServiceProxyGeneratorTool"
++			/>
++			<Tool
++				Name="VCMIDLTool"
++			/>
++			<Tool
++				Name="VCCLCompilerTool"
++				RuntimeLibrary="2"
++				WarningLevel="3"
++				Detect64BitPortabilityProblems="true"
++				DebugInformationFormat="3"
++			/>
++			<Tool
++				Name="VCManagedResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCPreLinkEventTool"
++			/>
++			<Tool
++				Name="VCLinkerTool"
++				GenerateDebugInformation="true"
++				OptimizeReferences="2"
++				EnableCOMDATFolding="2"
++				TargetMachine="1"
++			/>
++			<Tool
++				Name="VCALinkTool"
++			/>
++			<Tool
++				Name="VCManifestTool"
++			/>
++			<Tool
++				Name="VCXDCMakeTool"
++			/>
++			<Tool
++				Name="VCBscMakeTool"
++			/>
++			<Tool
++				Name="VCFxCopTool"
++			/>
++			<Tool
++				Name="VCAppVerifierTool"
++			/>
++			<Tool
++				Name="VCWebDeploymentTool"
++			/>
++			<Tool
++				Name="VCPostBuildEventTool"
++			/>
++		</Configuration>
++	</Configurations>
++	<References>
++		<ProjectReference
++			ReferencedProjectIdentifier="{B90D194E-8664-487C-A1FE-F1CA0B03B169}"
++			RelativePathToProject=".\libdbg\libdbg.vcproj"
++		/>
++		<ProjectReference
++			ReferencedProjectIdentifier="{8FCBED79-CCFE-49EF-90EB-04D38CFE6DFF}"
++			RelativePathToProject=".\deprecated\deprecated.vcproj"
++		/>
++		<ProjectReference
++			ReferencedProjectIdentifier="{D161A777-BCA1-4665-8D59-E8F1DED596B7}"
++			RelativePathToProject=".\diskmodel\diskmodel.vcproj"
++		/>
++		<ProjectReference
++			ReferencedProjectIdentifier="{B4BCA8C3-D980-42EF-B24B-3C40ABDEF9B4}"
++			RelativePathToProject=".\libparam\libparam.vcproj"
++		/>
++		<ProjectReference
++			ReferencedProjectIdentifier="{A6B73867-260A-4BE7-9A0E-38E21E514903}"
++			RelativePathToProject=".\memsmodel\memsmodel.vcproj"
++		/>
++	</References>
++	<Files>
++		<Filter
++			Name="source files"
++			>
++			<File
++				RelativePath="..\..\src\disksim.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_bus.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_bus_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_bus_stats_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_cache.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_cachedev.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_cachedev_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_cachemem.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_cachemem_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_controller.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_ctlr_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_ctlr_stats_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_ctlrdumb.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_ctlrsmart.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_device.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_device_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_device_stats_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_disk.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_disk_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_diskcache.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_diskctlr.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_global_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_interface.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_intr.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_iodriver.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_iodriver_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_iodriver_stats_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_iomap_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_ioqueue.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_ioqueue_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_iosim.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_iosim_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_iotrace.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_loadparams.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_logorg.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_logorg_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_main.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_malloc.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_pf_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_pf_stats_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_pfdisp.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_pfsim.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_rand48.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_redun.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_simpledisk.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_simpledisk_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_stat.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_statload.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_stats_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_syncset_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_synthgen_param.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_synthio.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\modules\disksim_synthio_param.c"
++				>
++			</File>
++		</Filter>
++		<Filter
++			Name="Header Files"
++			>
++			<File
++				RelativePath="..\..\src\config.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_assertlib.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_bitstring.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_bus.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_cache.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_cachedev.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_cachemem.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_controller.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_ctlr.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_device.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_disk.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_diskmap.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_global.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_hptrace.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_interface.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_interface_private.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_iodriver.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_ioface.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_ioqueue.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_iosim.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_iotrace.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_logorg.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_malloc.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_orgface.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_pfface.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_pfsim.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_rand48.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_reqflags.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_simpledisk.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_stat.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\disksim_synthio.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\inline.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\src\inst.h"
++				>
++			</File>
++		</Filter>
++	</Files>
++	<Globals>
++	</Globals>
++</VisualStudioProject>
+diff -Naur disksim-4.0/w32build/libdbg/libdbg.vcproj 4.0+ssd+Win/w32build/libdbg/libdbg.vcproj
+--- disksim-4.0/w32build/libdbg/libdbg.vcproj	1969-12-31 16:00:00.000000000 -0800
++++ 4.0+ssd+Win/w32build/libdbg/libdbg.vcproj	2008-08-12 16:13:14.000000000 -0700
+@@ -0,0 +1,182 @@
++<?xml version="1.0" encoding="Windows-1252"?>
++<VisualStudioProject
++	ProjectType="Visual C++"
++	Version="8.00"
++	Name="dbglib"
++	ProjectGUID="{B90D194E-8664-487C-A1FE-F1CA0B03B169}"
++	RootNamespace="DebugLib"
++	Keyword="ManagedCProj"
++	>
++	<Platforms>
++		<Platform
++			Name="Win32"
++		/>
++	</Platforms>
++	<ToolFiles>
++	</ToolFiles>
++	<Configurations>
++		<Configuration
++			Name="Debug|Win32"
++			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
++			IntermediateDirectory="$(ConfigurationName)"
++			ConfigurationType="4"
++			CharacterSet="1"
++			ManagedExtensions="0"
++			>
++			<Tool
++				Name="VCPreBuildEventTool"
++			/>
++			<Tool
++				Name="VCCustomBuildTool"
++			/>
++			<Tool
++				Name="VCXMLDataGeneratorTool"
++			/>
++			<Tool
++				Name="VCWebServiceProxyGeneratorTool"
++			/>
++			<Tool
++				Name="VCMIDLTool"
++			/>
++			<Tool
++				Name="VCCLCompilerTool"
++				Optimization="0"
++				AdditionalIncludeDirectories="..\..; ..\..\libparam"
++				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_DEPRECATE"
++				RuntimeLibrary="3"
++				UsePrecompiledHeader="0"
++				WarningLevel="1"
++				DebugInformationFormat="3"
++				CompileAs="1"
++			/>
++			<Tool
++				Name="VCManagedResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCPreLinkEventTool"
++			/>
++			<Tool
++				Name="VCLibrarianTool"
++			/>
++			<Tool
++				Name="VCALinkTool"
++			/>
++			<Tool
++				Name="VCXDCMakeTool"
++			/>
++			<Tool
++				Name="VCBscMakeTool"
++			/>
++			<Tool
++				Name="VCFxCopTool"
++			/>
++			<Tool
++				Name="VCPostBuildEventTool"
++			/>
++		</Configuration>
++		<Configuration
++			Name="Release|Win32"
++			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
++			IntermediateDirectory="$(ConfigurationName)"
++			ConfigurationType="2"
++			CharacterSet="1"
++			ManagedExtensions="1"
++			WholeProgramOptimization="1"
++			>
++			<Tool
++				Name="VCPreBuildEventTool"
++			/>
++			<Tool
++				Name="VCCustomBuildTool"
++			/>
++			<Tool
++				Name="VCXMLDataGeneratorTool"
++			/>
++			<Tool
++				Name="VCWebServiceProxyGeneratorTool"
++			/>
++			<Tool
++				Name="VCMIDLTool"
++			/>
++			<Tool
++				Name="VCCLCompilerTool"
++				PreprocessorDefinitions="WIN32;NDEBUG"
++				RuntimeLibrary="2"
++				UsePrecompiledHeader="2"
++				WarningLevel="3"
++				DebugInformationFormat="3"
++			/>
++			<Tool
++				Name="VCManagedResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCPreLinkEventTool"
++			/>
++			<Tool
++				Name="VCLinkerTool"
++				AdditionalDependencies="$(NoInherit)"
++				LinkIncremental="1"
++				GenerateDebugInformation="true"
++				TargetMachine="1"
++			/>
++			<Tool
++				Name="VCALinkTool"
++			/>
++			<Tool
++				Name="VCManifestTool"
++			/>
++			<Tool
++				Name="VCXDCMakeTool"
++			/>
++			<Tool
++				Name="VCBscMakeTool"
++			/>
++			<Tool
++				Name="VCFxCopTool"
++			/>
++			<Tool
++				Name="VCAppVerifierTool"
++			/>
++			<Tool
++				Name="VCWebDeploymentTool"
++			/>
++			<Tool
++				Name="VCPostBuildEventTool"
++			/>
++		</Configuration>
++	</Configurations>
++	<References>
++	</References>
++	<Files>
++		<Filter
++			Name="Source Files"
++			Filter="cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx"
++			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
++			>
++			<File
++				RelativePath="..\..\libddbg\ddbg_assert.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\libddbg\ddbg_trace.c"
++				>
++			</File>
++		</Filter>
++		<Filter
++			Name="Header Files"
++			>
++			<File
++				RelativePath="..\..\libddbg\libddbg.h"
++				>
++			</File>
++		</Filter>
++	</Files>
++	<Globals>
++	</Globals>
++</VisualStudioProject>
+diff -Naur disksim-4.0/w32build/libparam/libparam.vcproj 4.0+ssd+Win/w32build/libparam/libparam.vcproj
+--- disksim-4.0/w32build/libparam/libparam.vcproj	1969-12-31 16:00:00.000000000 -0800
++++ 4.0+ssd+Win/w32build/libparam/libparam.vcproj	2008-06-03 16:36:48.000000000 -0700
+@@ -0,0 +1,183 @@
++<?xml version="1.0" encoding="Windows-1252"?>
++<VisualStudioProject
++	ProjectType="Visual C++"
++	Version="8.00"
++	Name="libparam"
++	ProjectGUID="{B4BCA8C3-D980-42EF-B24B-3C40ABDEF9B4}"
++	RootNamespace="libparam"
++	Keyword="Win32Proj"
++	>
++	<Platforms>
++		<Platform
++			Name="Win32"
++		/>
++	</Platforms>
++	<ToolFiles>
++	</ToolFiles>
++	<Configurations>
++		<Configuration
++			Name="Debug|Win32"
++			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
++			IntermediateDirectory="$(ConfigurationName)"
++			ConfigurationType="4"
++			CharacterSet="1"
++			>
++			<Tool
++				Name="VCPreBuildEventTool"
++			/>
++			<Tool
++				Name="VCCustomBuildTool"
++			/>
++			<Tool
++				Name="VCXMLDataGeneratorTool"
++			/>
++			<Tool
++				Name="VCWebServiceProxyGeneratorTool"
++			/>
++			<Tool
++				Name="VCMIDLTool"
++			/>
++			<Tool
++				Name="VCCLCompilerTool"
++				Optimization="0"
++				AdditionalIncludeDirectories="..\..;..\..\libparam"
++				PreprocessorDefinitions="WIN32;_DEBUG;_LIB;_CRT_SECURE_NO_DEPRECATE;YY_NO_UNISTD_H"
++				MinimalRebuild="true"
++				BasicRuntimeChecks="3"
++				RuntimeLibrary="3"
++				UsePrecompiledHeader="0"
++				WarningLevel="1"
++				Detect64BitPortabilityProblems="true"
++				DebugInformationFormat="4"
++				CompileAs="1"
++			/>
++			<Tool
++				Name="VCManagedResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCPreLinkEventTool"
++			/>
++			<Tool
++				Name="VCLibrarianTool"
++			/>
++			<Tool
++				Name="VCALinkTool"
++			/>
++			<Tool
++				Name="VCXDCMakeTool"
++			/>
++			<Tool
++				Name="VCBscMakeTool"
++			/>
++			<Tool
++				Name="VCFxCopTool"
++			/>
++			<Tool
++				Name="VCPostBuildEventTool"
++			/>
++		</Configuration>
++		<Configuration
++			Name="Release|Win32"
++			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
++			IntermediateDirectory="$(ConfigurationName)"
++			ConfigurationType="4"
++			CharacterSet="1"
++			WholeProgramOptimization="1"
++			>
++			<Tool
++				Name="VCPreBuildEventTool"
++			/>
++			<Tool
++				Name="VCCustomBuildTool"
++			/>
++			<Tool
++				Name="VCXMLDataGeneratorTool"
++			/>
++			<Tool
++				Name="VCWebServiceProxyGeneratorTool"
++			/>
++			<Tool
++				Name="VCMIDLTool"
++			/>
++			<Tool
++				Name="VCCLCompilerTool"
++				PreprocessorDefinitions="WIN32;NDEBUG;_LIB"
++				RuntimeLibrary="2"
++				UsePrecompiledHeader="0"
++				WarningLevel="3"
++				Detect64BitPortabilityProblems="true"
++				DebugInformationFormat="3"
++			/>
++			<Tool
++				Name="VCManagedResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCPreLinkEventTool"
++			/>
++			<Tool
++				Name="VCLibrarianTool"
++			/>
++			<Tool
++				Name="VCALinkTool"
++			/>
++			<Tool
++				Name="VCXDCMakeTool"
++			/>
++			<Tool
++				Name="VCBscMakeTool"
++			/>
++			<Tool
++				Name="VCFxCopTool"
++			/>
++			<Tool
++				Name="VCPostBuildEventTool"
++			/>
++		</Configuration>
++	</Configurations>
++	<References>
++	</References>
++	<Files>
++		<Filter
++			Name="Source Files"
++			Filter="cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx"
++			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
++			>
++			<File
++				RelativePath="..\..\libparam\lex.libparam.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\libparam\libparam.tab.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\libparam\util.c"
++				>
++			</File>
++		</Filter>
++		<Filter
++			Name="Header Files"
++			>
++			<File
++				RelativePath="..\..\libparam\bitvector.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\libparam\libparam.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\libparam\libparam.tab.h"
++				>
++			</File>
++		</Filter>
++	</Files>
++	<Globals>
++	</Globals>
++</VisualStudioProject>
+diff -Naur disksim-4.0/w32build/memsmodel/memsmodel.vcproj 4.0+ssd+Win/w32build/memsmodel/memsmodel.vcproj
+--- disksim-4.0/w32build/memsmodel/memsmodel.vcproj	1969-12-31 16:00:00.000000000 -0800
++++ 4.0+ssd+Win/w32build/memsmodel/memsmodel.vcproj	2008-06-03 09:32:44.000000000 -0700
+@@ -0,0 +1,229 @@
++<?xml version="1.0" encoding="Windows-1252"?>
++<VisualStudioProject
++	ProjectType="Visual C++"
++	Version="8.00"
++	Name="memsmodel"
++	ProjectGUID="{A6B73867-260A-4BE7-9A0E-38E21E514903}"
++	RootNamespace="memsmodel"
++	Keyword="Win32Proj"
++	>
++	<Platforms>
++		<Platform
++			Name="Win32"
++		/>
++	</Platforms>
++	<ToolFiles>
++	</ToolFiles>
++	<Configurations>
++		<Configuration
++			Name="Debug|Win32"
++			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
++			IntermediateDirectory="$(ConfigurationName)"
++			ConfigurationType="4"
++			CharacterSet="1"
++			>
++			<Tool
++				Name="VCPreBuildEventTool"
++			/>
++			<Tool
++				Name="VCCustomBuildTool"
++			/>
++			<Tool
++				Name="VCXMLDataGeneratorTool"
++			/>
++			<Tool
++				Name="VCWebServiceProxyGeneratorTool"
++			/>
++			<Tool
++				Name="VCMIDLTool"
++			/>
++			<Tool
++				Name="VCCLCompilerTool"
++				Optimization="0"
++				AdditionalIncludeDirectories="..\..;..\..\memsmodel;..\..\src"
++				PreprocessorDefinitions="WIN32;_DEBUG;_LIB;_CRT_SECURE_NO_DEPRECATE"
++				MinimalRebuild="true"
++				BasicRuntimeChecks="3"
++				RuntimeLibrary="3"
++				UsePrecompiledHeader="0"
++				WarningLevel="1"
++				Detect64BitPortabilityProblems="true"
++				DebugInformationFormat="4"
++				CompileAs="1"
++			/>
++			<Tool
++				Name="VCManagedResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCPreLinkEventTool"
++			/>
++			<Tool
++				Name="VCLibrarianTool"
++			/>
++			<Tool
++				Name="VCALinkTool"
++			/>
++			<Tool
++				Name="VCXDCMakeTool"
++			/>
++			<Tool
++				Name="VCBscMakeTool"
++			/>
++			<Tool
++				Name="VCFxCopTool"
++			/>
++			<Tool
++				Name="VCPostBuildEventTool"
++			/>
++		</Configuration>
++		<Configuration
++			Name="Release|Win32"
++			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
++			IntermediateDirectory="$(ConfigurationName)"
++			ConfigurationType="4"
++			CharacterSet="1"
++			WholeProgramOptimization="1"
++			>
++			<Tool
++				Name="VCPreBuildEventTool"
++			/>
++			<Tool
++				Name="VCCustomBuildTool"
++			/>
++			<Tool
++				Name="VCXMLDataGeneratorTool"
++			/>
++			<Tool
++				Name="VCWebServiceProxyGeneratorTool"
++			/>
++			<Tool
++				Name="VCMIDLTool"
++			/>
++			<Tool
++				Name="VCCLCompilerTool"
++				PreprocessorDefinitions="WIN32;NDEBUG;_LIB"
++				RuntimeLibrary="2"
++				UsePrecompiledHeader="0"
++				WarningLevel="3"
++				Detect64BitPortabilityProblems="true"
++				DebugInformationFormat="3"
++			/>
++			<Tool
++				Name="VCManagedResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCPreLinkEventTool"
++			/>
++			<Tool
++				Name="VCLibrarianTool"
++			/>
++			<Tool
++				Name="VCALinkTool"
++			/>
++			<Tool
++				Name="VCXDCMakeTool"
++			/>
++			<Tool
++				Name="VCBscMakeTool"
++			/>
++			<Tool
++				Name="VCFxCopTool"
++			/>
++			<Tool
++				Name="VCPostBuildEventTool"
++			/>
++		</Configuration>
++	</Configurations>
++	<References>
++	</References>
++	<Files>
++		<Filter
++			Name="Source Files"
++			Filter="cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx"
++			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
++			>
++			<File
++				RelativePath="..\..\memsmodel\mems_buffer.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\memsmodel\mems_disksim.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\memsmodel\mems_event.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\memsmodel\mems_hong_seek.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\memsmodel\mems_internals.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\memsmodel\mems_mapping.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\memsmodel\mems_piecewise_seek.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\memsmodel\modules\memsmodel_mems_param.c"
++				>
++			</File>
++		</Filter>
++		<Filter
++			Name="Header Files"
++			Filter="h;hpp;hxx;hm;inl;inc;xsd"
++			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
++			>
++			<File
++				RelativePath="..\..\memsmodel\mems_buffer.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\memsmodel\mems_disksim.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\memsmodel\mems_global.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\memsmodel\mems_hong_seek.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\memsmodel\mems_internals.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\memsmodel\mems_mapping.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\memsmodel\mems_piecewise_seek.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\memsmodel\modules\memsmodel_mems_param.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\memsmodel\modules\modules.h"
++				>
++			</File>
++		</Filter>
++	</Files>
++	<Globals>
++	</Globals>
++</VisualStudioProject>
+diff -Naur disksim-4.0/w32build/relex 4.0+ssd+Win/w32build/relex
+--- disksim-4.0/w32build/relex	1969-12-31 16:00:00.000000000 -0800
++++ 4.0+ssd+Win/w32build/relex	2008-06-03 16:27:56.000000000 -0700
+@@ -0,0 +1,9 @@
++#!/bin/sh
++
++# run this under Cygwin bash to generate the libparam parser
++
++cd ../libparam
++flex -Plibparam libparam.lex
++bison -plibparam --defines libparam.y
++
++
+diff -Naur disksim-4.0/w32build/remod 4.0+ssd+Win/w32build/remod
+--- disksim-4.0/w32build/remod	1969-12-31 16:00:00.000000000 -0800
++++ 4.0+ssd+Win/w32build/remod	2008-08-15 18:48:56.000000000 -0700
+@@ -0,0 +1,44 @@
++#!/bin/sh
++
++# run this under Cygwin bash to generate the model modules
++
++cd ../src/modules
++FILES="*.modspec"
++for f in $FILES
++do
++   echo $f
++   perl ../../libparam/mod.pl disksim $f
++done
++echo $FILES
++perl ../../libparam/make_modules_h.pl disksim $FILES > modules.h
++
++cd ../../diskmodel/modules
++FILES="*.modspec"
++for f in $FILES
++do
++   echo $f
++   perl ../../libparam/mod.pl dm $f
++done
++echo $FILES
++perl ../../libparam/make_modules_h.pl dm $FILES > modules.h
++
++cd ../../memsmodel/modules
++FILES="*.modspec"
++for f in $FILES
++do
++   echo $f
++   perl ../../libparam/mod.pl memsmodel $f
++done
++echo $FILES
++perl ../../libparam/make_modules_h.pl memsmodel $FILES > modules.h
++
++cd ../../ssdmodel/modules
++FILES="*.modspec"
++for f in $FILES
++do
++   echo $f
++   perl ../../libparam/mod.pl ssdmodel $f
++done
++echo $FILES
++perl ../../libparam/make_modules_h.pl ssdmodel $FILES > modules.h
++
+diff -Naur disksim-4.0/w32build/rms/rms.vcproj 4.0+ssd+Win/w32build/rms/rms.vcproj
+--- disksim-4.0/w32build/rms/rms.vcproj	1969-12-31 16:00:00.000000000 -0800
++++ 4.0+ssd+Win/w32build/rms/rms.vcproj	2008-08-12 16:13:14.000000000 -0700
+@@ -0,0 +1,186 @@
++<?xml version="1.0" encoding="Windows-1252"?>
++<VisualStudioProject
++	ProjectType="Visual C++"
++	Version="8.00"
++	Name="rms"
++	ProjectGUID="{535D85D5-092E-4B94-943F-1E96280F323E}"
++	RootNamespace="rms"
++	Keyword="Win32Proj"
++	>
++	<Platforms>
++		<Platform
++			Name="Win32"
++		/>
++	</Platforms>
++	<ToolFiles>
++	</ToolFiles>
++	<Configurations>
++		<Configuration
++			Name="Debug|Win32"
++			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
++			IntermediateDirectory="$(ConfigurationName)"
++			ConfigurationType="1"
++			CharacterSet="1"
++			>
++			<Tool
++				Name="VCPreBuildEventTool"
++			/>
++			<Tool
++				Name="VCCustomBuildTool"
++			/>
++			<Tool
++				Name="VCXMLDataGeneratorTool"
++			/>
++			<Tool
++				Name="VCWebServiceProxyGeneratorTool"
++			/>
++			<Tool
++				Name="VCMIDLTool"
++			/>
++			<Tool
++				Name="VCCLCompilerTool"
++				Optimization="0"
++				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_DEPRECATE"
++				MinimalRebuild="true"
++				BasicRuntimeChecks="3"
++				RuntimeLibrary="3"
++				UsePrecompiledHeader="0"
++				WarningLevel="1"
++				Detect64BitPortabilityProblems="true"
++				DebugInformationFormat="4"
++				CompileAs="1"
++			/>
++			<Tool
++				Name="VCManagedResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCPreLinkEventTool"
++			/>
++			<Tool
++				Name="VCLinkerTool"
++				LinkIncremental="2"
++				GenerateDebugInformation="true"
++				SubSystem="1"
++				TargetMachine="1"
++			/>
++			<Tool
++				Name="VCALinkTool"
++			/>
++			<Tool
++				Name="VCManifestTool"
++			/>
++			<Tool
++				Name="VCXDCMakeTool"
++			/>
++			<Tool
++				Name="VCBscMakeTool"
++			/>
++			<Tool
++				Name="VCFxCopTool"
++			/>
++			<Tool
++				Name="VCAppVerifierTool"
++			/>
++			<Tool
++				Name="VCWebDeploymentTool"
++			/>
++			<Tool
++				Name="VCPostBuildEventTool"
++			/>
++		</Configuration>
++		<Configuration
++			Name="Release|Win32"
++			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
++			IntermediateDirectory="$(ConfigurationName)"
++			ConfigurationType="1"
++			CharacterSet="1"
++			WholeProgramOptimization="1"
++			>
++			<Tool
++				Name="VCPreBuildEventTool"
++			/>
++			<Tool
++				Name="VCCustomBuildTool"
++			/>
++			<Tool
++				Name="VCXMLDataGeneratorTool"
++			/>
++			<Tool
++				Name="VCWebServiceProxyGeneratorTool"
++			/>
++			<Tool
++				Name="VCMIDLTool"
++			/>
++			<Tool
++				Name="VCCLCompilerTool"
++				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
++				RuntimeLibrary="2"
++				UsePrecompiledHeader="0"
++				WarningLevel="3"
++				Detect64BitPortabilityProblems="true"
++				DebugInformationFormat="3"
++			/>
++			<Tool
++				Name="VCManagedResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCPreLinkEventTool"
++			/>
++			<Tool
++				Name="VCLinkerTool"
++				LinkIncremental="1"
++				GenerateDebugInformation="true"
++				SubSystem="1"
++				OptimizeReferences="2"
++				EnableCOMDATFolding="2"
++				TargetMachine="1"
++			/>
++			<Tool
++				Name="VCALinkTool"
++			/>
++			<Tool
++				Name="VCManifestTool"
++			/>
++			<Tool
++				Name="VCXDCMakeTool"
++			/>
++			<Tool
++				Name="VCBscMakeTool"
++			/>
++			<Tool
++				Name="VCFxCopTool"
++			/>
++			<Tool
++				Name="VCAppVerifierTool"
++			/>
++			<Tool
++				Name="VCWebDeploymentTool"
++			/>
++			<Tool
++				Name="VCPostBuildEventTool"
++			/>
++		</Configuration>
++	</Configurations>
++	<References>
++	</References>
++	<Files>
++		<Filter
++			Name="Source Files"
++			Filter="cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx"
++			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
++			>
++			<File
++				RelativePath="..\..\src\rms.c"
++				>
++			</File>
++		</Filter>
++	</Files>
++	<Globals>
++	</Globals>
++</VisualStudioProject>
+diff -Naur disksim-4.0/w32build/runvalid 4.0+ssd+Win/w32build/runvalid
+--- disksim-4.0/w32build/runvalid	1969-12-31 16:00:00.000000000 -0800
++++ 4.0+ssd+Win/w32build/runvalid	2008-08-19 12:17:12.333013600 -0700
+@@ -0,0 +1,9 @@
++#!/bin/sh
++
++# run this under Cygwin bash to run the simulator validation suite
++
++RUNVALID_PREFIX=../w32build/Debug
++export RUNVALID_PREFIX
++cd  ../valid
++./runvalid
++
+diff -Naur disksim-4.0/w32build/ssdmodel/runvalid 4.0+ssd+Win/w32build/ssdmodel/runvalid
+--- disksim-4.0/w32build/ssdmodel/runvalid	1969-12-31 16:00:00.000000000 -0800
++++ 4.0+ssd+Win/w32build/ssdmodel/runvalid	2008-09-12 14:10:36.556916600 -0700
+@@ -0,0 +1,9 @@
++#!/bin/sh
++
++# run this under Cygwin bash to run the simulator validation suite
++
++RUNVALID_PREFIX=../../w32build/Debug
++export RUNVALID_PREFIX
++cd  ../../ssdmodel/valid
++./runvalid
++
+diff -Naur disksim-4.0/w32build/ssdmodel/ssdmodel.vcproj 4.0+ssd+Win/w32build/ssdmodel/ssdmodel.vcproj
+--- disksim-4.0/w32build/ssdmodel/ssdmodel.vcproj	1969-12-31 16:00:00.000000000 -0800
++++ 4.0+ssd+Win/w32build/ssdmodel/ssdmodel.vcproj	2008-08-16 13:27:16.000000000 -0700
+@@ -0,0 +1,221 @@
++<?xml version="1.0" encoding="Windows-1252"?>
++<VisualStudioProject
++	ProjectType="Visual C++"
++	Version="8.00"
++	Name="ssdmodel"
++	ProjectGUID="{94C48629-B43B-456F-A1F8-9C24906BF27E}"
++	RootNamespace="memsmodel"
++	Keyword="Win32Proj"
++	>
++	<Platforms>
++		<Platform
++			Name="Win32"
++		/>
++	</Platforms>
++	<ToolFiles>
++	</ToolFiles>
++	<Configurations>
++		<Configuration
++			Name="Debug|Win32"
++			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
++			IntermediateDirectory="$(ConfigurationName)"
++			ConfigurationType="4"
++			CharacterSet="1"
++			>
++			<Tool
++				Name="VCPreBuildEventTool"
++			/>
++			<Tool
++				Name="VCCustomBuildTool"
++			/>
++			<Tool
++				Name="VCXMLDataGeneratorTool"
++			/>
++			<Tool
++				Name="VCWebServiceProxyGeneratorTool"
++			/>
++			<Tool
++				Name="VCMIDLTool"
++			/>
++			<Tool
++				Name="VCCLCompilerTool"
++				Optimization="0"
++				AdditionalIncludeDirectories="..\..;..\..\memsmodel;..\..\src"
++				PreprocessorDefinitions="WIN32;_DEBUG;_LIB;_CRT_SECURE_NO_DEPRECATE"
++				MinimalRebuild="true"
++				BasicRuntimeChecks="3"
++				RuntimeLibrary="3"
++				UsePrecompiledHeader="0"
++				WarningLevel="1"
++				Detect64BitPortabilityProblems="true"
++				DebugInformationFormat="4"
++				CompileAs="1"
++			/>
++			<Tool
++				Name="VCManagedResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCPreLinkEventTool"
++			/>
++			<Tool
++				Name="VCLibrarianTool"
++			/>
++			<Tool
++				Name="VCALinkTool"
++			/>
++			<Tool
++				Name="VCXDCMakeTool"
++			/>
++			<Tool
++				Name="VCBscMakeTool"
++			/>
++			<Tool
++				Name="VCFxCopTool"
++			/>
++			<Tool
++				Name="VCPostBuildEventTool"
++			/>
++		</Configuration>
++		<Configuration
++			Name="Release|Win32"
++			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
++			IntermediateDirectory="$(ConfigurationName)"
++			ConfigurationType="4"
++			CharacterSet="1"
++			WholeProgramOptimization="1"
++			>
++			<Tool
++				Name="VCPreBuildEventTool"
++			/>
++			<Tool
++				Name="VCCustomBuildTool"
++			/>
++			<Tool
++				Name="VCXMLDataGeneratorTool"
++			/>
++			<Tool
++				Name="VCWebServiceProxyGeneratorTool"
++			/>
++			<Tool
++				Name="VCMIDLTool"
++			/>
++			<Tool
++				Name="VCCLCompilerTool"
++				PreprocessorDefinitions="WIN32;NDEBUG;_LIB"
++				RuntimeLibrary="2"
++				UsePrecompiledHeader="0"
++				WarningLevel="3"
++				Detect64BitPortabilityProblems="true"
++				DebugInformationFormat="3"
++			/>
++			<Tool
++				Name="VCManagedResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCPreLinkEventTool"
++			/>
++			<Tool
++				Name="VCLibrarianTool"
++			/>
++			<Tool
++				Name="VCALinkTool"
++			/>
++			<Tool
++				Name="VCXDCMakeTool"
++			/>
++			<Tool
++				Name="VCBscMakeTool"
++			/>
++			<Tool
++				Name="VCFxCopTool"
++			/>
++			<Tool
++				Name="VCPostBuildEventTool"
++			/>
++		</Configuration>
++	</Configurations>
++	<References>
++	</References>
++	<Files>
++		<Filter
++			Name="Source Files"
++			Filter="cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx"
++			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
++			>
++			<File
++				RelativePath="..\..\ssdmodel\ssd.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\ssdmodel\ssd_clean.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\ssdmodel\ssd_gang.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\ssdmodel\ssd_init.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\ssdmodel\ssd_timing.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\ssdmodel\ssd_utils.c"
++				>
++			</File>
++			<File
++				RelativePath="..\..\ssdmodel\modules\ssdmodel_ssd_param.c"
++				>
++			</File>
++		</Filter>
++		<Filter
++			Name="Header Files"
++			Filter="h;hpp;hxx;hm;inl;inc;xsd"
++			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
++			>
++			<File
++				RelativePath="..\..\ssdmodel\modules\modules.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\ssdmodel\ssd.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\ssdmodel\ssd_clean.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\ssdmodel\ssd_gang.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\ssdmodel\ssd_init.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\ssdmodel\ssd_timing.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\ssdmodel\ssd_utils.h"
++				>
++			</File>
++			<File
++				RelativePath="..\..\ssdmodel\modules\ssdmodel_ssd_param.h"
++				>
++			</File>
++		</Filter>
++	</Files>
++	<Globals>
++	</Globals>
++</VisualStudioProject>
+diff -Naur disksim-4.0/w32build/syssim/syssim.vcproj 4.0+ssd+Win/w32build/syssim/syssim.vcproj
+--- disksim-4.0/w32build/syssim/syssim.vcproj	1969-12-31 16:00:00.000000000 -0800
++++ 4.0+ssd+Win/w32build/syssim/syssim.vcproj	2008-08-12 16:13:14.000000000 -0700
+@@ -0,0 +1,211 @@
++<?xml version="1.0" encoding="Windows-1252"?>
++<VisualStudioProject
++	ProjectType="Visual C++"
++	Version="8.00"
++	Name="syssim"
++	ProjectGUID="{4F0A9C7F-695A-4BE2-96EA-9941F66334EE}"
++	RootNamespace="syssim"
++	Keyword="ManagedCProj"
++	>
++	<Platforms>
++		<Platform
++			Name="Win32"
++		/>
++	</Platforms>
++	<ToolFiles>
++	</ToolFiles>
++	<Configurations>
++		<Configuration
++			Name="Debug|Win32"
++			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
++			IntermediateDirectory="$(ConfigurationName)"
++			ConfigurationType="1"
++			CharacterSet="1"
++			ManagedExtensions="0"
++			>
++			<Tool
++				Name="VCPreBuildEventTool"
++			/>
++			<Tool
++				Name="VCCustomBuildTool"
++			/>
++			<Tool
++				Name="VCXMLDataGeneratorTool"
++			/>
++			<Tool
++				Name="VCWebServiceProxyGeneratorTool"
++			/>
++			<Tool
++				Name="VCMIDLTool"
++			/>
++			<Tool
++				Name="VCCLCompilerTool"
++				Optimization="0"
++				AdditionalIncludeDirectories="..;..\src"
++				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_DEPRECATE"
++				RuntimeLibrary="3"
++				UsePrecompiledHeader="0"
++				WarningLevel="1"
++				DebugInformationFormat="3"
++				CompileAs="1"
++			/>
++			<Tool
++				Name="VCManagedResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCPreLinkEventTool"
++			/>
++			<Tool
++				Name="VCLinkerTool"
++			/>
++			<Tool
++				Name="VCALinkTool"
++			/>
++			<Tool
++				Name="VCManifestTool"
++			/>
++			<Tool
++				Name="VCXDCMakeTool"
++			/>
++			<Tool
++				Name="VCBscMakeTool"
++			/>
++			<Tool
++				Name="VCFxCopTool"
++			/>
++			<Tool
++				Name="VCAppVerifierTool"
++			/>
++			<Tool
++				Name="VCWebDeploymentTool"
++			/>
++			<Tool
++				Name="VCPostBuildEventTool"
++			/>
++		</Configuration>
++		<Configuration
++			Name="Release|Win32"
++			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
++			IntermediateDirectory="$(ConfigurationName)"
++			ConfigurationType="2"
++			CharacterSet="1"
++			ManagedExtensions="1"
++			WholeProgramOptimization="1"
++			>
++			<Tool
++				Name="VCPreBuildEventTool"
++			/>
++			<Tool
++				Name="VCCustomBuildTool"
++			/>
++			<Tool
++				Name="VCXMLDataGeneratorTool"
++			/>
++			<Tool
++				Name="VCWebServiceProxyGeneratorTool"
++			/>
++			<Tool
++				Name="VCMIDLTool"
++			/>
++			<Tool
++				Name="VCCLCompilerTool"
++				PreprocessorDefinitions="WIN32;NDEBUG"
++				RuntimeLibrary="2"
++				UsePrecompiledHeader="2"
++				WarningLevel="3"
++				DebugInformationFormat="3"
++			/>
++			<Tool
++				Name="VCManagedResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCResourceCompilerTool"
++			/>
++			<Tool
++				Name="VCPreLinkEventTool"
++			/>
++			<Tool
++				Name="VCLinkerTool"
++				AdditionalDependencies="$(NoInherit)"
++				LinkIncremental="1"
++				GenerateDebugInformation="true"
++				TargetMachine="1"
++			/>
++			<Tool
++				Name="VCALinkTool"
++			/>
++			<Tool
++				Name="VCManifestTool"
++			/>
++			<Tool
++				Name="VCXDCMakeTool"
++			/>
++			<Tool
++				Name="VCBscMakeTool"
++			/>
++			<Tool
++				Name="VCFxCopTool"
++			/>
++			<Tool
++				Name="VCAppVerifierTool"
++			/>
++			<Tool
++				Name="VCWebDeploymentTool"
++			/>
++			<Tool
++				Name="VCPostBuildEventTool"
++			/>
++		</Configuration>
++	</Configurations>
++	<References>
++		<ProjectReference
++			ReferencedProjectIdentifier="{B90D194E-8664-487C-A1FE-F1CA0B03B169}"
++			RelativePathToProject=".\libdbg\libdbg.vcproj"
++		/>
++		<ProjectReference
++			ReferencedProjectIdentifier="{D161A777-BCA1-4665-8D59-E8F1DED596B7}"
++			RelativePathToProject=".\diskmodel\diskmodel.vcproj"
++		/>
++		<ProjectReference
++			ReferencedProjectIdentifier="{18591E37-0658-4D76-839C-41FAC9806832}"
++			RelativePathToProject=".\disksimlib\disksimlib.vcproj"
++		/>
++		<ProjectReference
++			ReferencedProjectIdentifier="{B4BCA8C3-D980-42EF-B24B-3C40ABDEF9B4}"
++			RelativePathToProject=".\libparam\libparam.vcproj"
++		/>
++		<ProjectReference
++			ReferencedProjectIdentifier="{A6B73867-260A-4BE7-9A0E-38E21E514903}"
++			RelativePathToProject=".\memsmodel\memsmodel.vcproj"
++		/>
++		<ProjectReference
++			ReferencedProjectIdentifier="{8FCBED79-CCFE-49EF-90EB-04D38CFE6DFF}"
++			RelativePathToProject=".\deprecated\deprecated.vcproj"
++		/>
++	</References>
++	<Files>
++		<Filter
++			Name="Source Files"
++			Filter="cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx"
++			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
++			>
++			<File
++				RelativePath="..\..\src\syssim_driver.c"
++				>
++			</File>
++		</Filter>
++		<Filter
++			Name="Header Files"
++			>
++			<File
++				RelativePath="..\..\src\syssim_driver.h"
++				>
++			</File>
++		</Filter>
++	</Files>
++	<Globals>
++	</Globals>
++</VisualStudioProject>

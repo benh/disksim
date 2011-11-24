@@ -32,6 +32,11 @@
 #include "layout_g4.h"
 #include "layout_g4_private.h"
 
+#ifdef _WIN32
+#define inline __inline
+#define __inline__ __inline
+#endif
+
 static inline int min(int x, int y) {
   return x < y ? x : y;
 }
@@ -183,7 +188,7 @@ g4_path_append(struct g4_path *p,
 	       int quot,
 	       int resid) 
 {
-  ddbg_assert(p->length < G4_ALLOC_PATH);
+//ddbg_assert(p->length < G4_ALLOC_PATH);
   struct g4_path_node *pp = &p->path[p->length];
   
   pp->n = n;
@@ -575,10 +580,11 @@ g4_track_bound(struct dm_disk_if *d,
 
   int spt = g4_spt_pbn(d, pbn);
 
+  /* Dushyanth: must set l0 and ln even if ptol() returns an error */
   lbn = ptol(d, pbn, 0);
-  if(lbn < 0) {
-    return lbn;
-  }
+  //if(lbn < 0) {
+  //  return lbn;
+  //}
 
   if(l0) {
     pi = *pbn;
@@ -605,6 +611,11 @@ g4_track_bound(struct dm_disk_if *d,
 
   if (l0 && ln) {
     ddbg_assert(*l0 <= *ln);
+  }
+
+  /* Dushyanth: check error here; see comment above about setting l0, ln */
+  if(lbn < 0) {
+    return lbn;
   }
 
   return DM_OK;
@@ -763,6 +774,19 @@ g4_get_zone(struct dm_disk_if *d, int n, struct dm_layout_zone *z)
 
 
 struct dm_layout_if layout_g4 = {
+#ifdef WIN32
+  ltop,
+  ptol,
+  g4_spt_lbn,
+  g4_spt_pbn,
+  g4_track_bound, 
+  g4_skew,
+  g4_atop,
+  g4_sector_width, 
+  g4_defect_count,
+  g4_get_numzones,
+  g4_get_zone
+#else
   .dm_translate_ltop = ltop,
   .dm_translate_ptol = ptol,
 
@@ -779,5 +803,5 @@ struct dm_layout_if layout_g4 = {
   .dm_defect_count = g4_defect_count,
   .dm_get_numzones = g4_get_numzones,
   .dm_get_zone = g4_get_zone
- 
+#endif
 };

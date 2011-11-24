@@ -806,8 +806,14 @@ void disksim_simulate_event (int num)
 	     && (curr->type <= MEMS_MAX_EVENT)) 
     {
       io_internal_event ((ioreq_event *)curr);
-    } 
-    else if (curr->type == CHECKPOINT) 
+    }
+    /* SSD: These are ssd specific events */
+    else if ((curr->type >= SSD_MIN_EVENT)
+         && (curr->type <= SSD_MAX_EVENT))
+    {
+      io_internal_event ((ioreq_event *)curr);
+    }
+    else if (curr->type == CHECKPOINT)
     {
       if (disksim->checkpoint_interval) {
 	disksim_register_checkpoint(simtime + disksim->checkpoint_interval);

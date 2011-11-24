@@ -43,7 +43,12 @@
 
 
 // undef this to turn off inlining
+#ifdef WIN32
+#define INLINE
+#else
 #define INLINE inline
+#endif
+
 
 // freebsd foo
 #ifdef _DISKMODEL_FREEBSD

@@ -153,6 +153,11 @@
 #define MEMS_BUS_TRANSFER			207
 #define MEMS_BUS_UPDATE			        208
 
+/* SSD: ssd event types -- keep this between SSD_MIN_EVENT and SSD_MAX_EVENT */
+
+#define SSD_CLEAN_ELEMENT		        301
+#define SSD_CLEAN_GANG			        302
+
 /* I/O Interrupt cause types */
 
 typedef enum {

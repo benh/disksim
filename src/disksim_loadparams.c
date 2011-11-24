@@ -43,6 +43,8 @@
 
 #include <diskmodel/modules/modules.h>
 #include <memsmodel/modules/modules.h>
+/*SSD:*/
+#include <ssdmodel/modules/modules.h>
 
 #include <stdio.h>
 
@@ -73,6 +75,11 @@ int disksim_loadparams(char *inputfile, int synthgen) {
   // memsmodel modules
   for(c = 0; c <= MEMSMODEL_MAX_MODULE; c++) {
     lp_register_module(memsmodel_mods[c]);
+  }  
+
+  // ssdmodel modules
+  for(c = 0; c <= SSDMODEL_MAX_MODULE; c++) {
+    lp_register_module(ssdmodel_mods[c]);
   }  
 
   lp_register_topoloader(disksim_topoloader);

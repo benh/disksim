@@ -3996,7 +3996,9 @@ disk_buffer_seekdone(disk *currdisk, ioreq_event *curr)
   struct dm_pbn pbn;
   
 
+#ifndef WIN32
   disksim_inst_enter();
+#endif
 
   // first and last blocks on current track
   int first, last;
@@ -4042,12 +4044,13 @@ disk_buffer_seekdone(disk *currdisk, ioreq_event *curr)
 
   {
     struct dm_pbn pbn;
+    // win32 moved for compilation
+    dm_ptol_result_t rv;
     currdisk->model->layout->dm_translate_ltop(currdisk->model,
 					       curr->blkno,
 					       MAP_FULL,
 					       &pbn,
 					       NULL);
-    dm_ptol_result_t rv;
     rv = currdisk->model->layout->
       dm_get_track_boundaries(currdisk->model, 
 			      &pbn,
@@ -4136,9 +4139,15 @@ disk_buffer_seekdone(disk *currdisk, ioreq_event *curr)
   // used to have curr->blkno = first + trackstart here
   // At the very minimum, slips will screw this up.
   {
+#ifdef WIN32
+      struct dm_pbn tmppbn = { currdisk->mech_state.cyl,
+			     currdisk->mech_state.head,
+			     trackstart };
+#else
     struct dm_pbn tmppbn = { .cyl = currdisk->mech_state.cyl,
 			     .head = currdisk->mech_state.head,
 			     .sector = trackstart };
+#endif
     
     curr->blkno = currdisk->model->layout->dm_translate_ptol(currdisk->model, &tmppbn, 0);
     ddbg_assert(curr->blkno >= 0);
@@ -4355,6 +4364,8 @@ disk_buffer_sector_done (disk *currdisk, ioreq_event *curr)
   disksim_inst_enter();
 
   currdisk->fpcheck--;
+
+  /* Dushyanth: this seems to fire, so: */
   ddbg_assert(currdisk->fpcheck); // see the comment in the header
   
   //  printf("%s %d %d\n", __func__, curr->blkno, curr->cause);

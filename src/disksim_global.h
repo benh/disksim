@@ -219,6 +219,8 @@ typedef      unsigned u_int;
 #define EXIT_DISKSIM		124
 #define MEMS_MIN_EVENT		200
 #define MEMS_MAX_EVENT		220
+#define SSD_MIN_EVENT		300
+#define SSD_MAX_EVENT		320
 
 /* Interrupt vector types */
 
@@ -283,6 +285,8 @@ typedef struct ioreq_ev {
    void  *tempptr2;
    void  *mems_sled;	 /* mems sled associated with a particular event */
    void  *mems_reqinfo; /* per-request info for mems subsystem */
+   int    ssd_elem_num;	 /* SSD: element to which this request went */
+   int    ssd_gang_num ; /* SSD: gang to which this request went */
    double start_time;    /* temporary; used for memulator timing */
    int    batchno;
    int    batch_complete;
@@ -406,6 +410,7 @@ typedef struct disksim {
    struct disk_info *diskinfo;
    struct simpledisk_info *simplediskinfo;
    struct mems_info *memsinfo;
+   struct ssd_info *ssdinfo;  /* SSD: ssd specific plugin */
    struct iodriver_info *iodriver_info;
    struct businfo *businfo;
    struct ctlrinfo *ctlrinfo;

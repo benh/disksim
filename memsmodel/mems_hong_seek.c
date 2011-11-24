@@ -7,12 +7,12 @@
 #define _VERBOSE_ 0
 
 long double
-min(long double x, long double y) {
+dmin(long double x, long double y) {
   return (x < y) ? x : y;
 }
 
 long double
-max(long double x, long double y) {
+dmax(long double x, long double y) {
   return (x > y) ? x : y;
 }
 
@@ -49,8 +49,8 @@ find_seek_time_hong_x(long double start_offset_nm, long double end_offset_nm,
 
   long double temp_tx;
 
-  x0 = min(start_offset_nm, end_offset_nm);
-  x1 = max(start_offset_nm, end_offset_nm);
+  x0 = dmin(start_offset_nm, end_offset_nm);
+  x1 = dmax(start_offset_nm, end_offset_nm);
 
   x0 /= 1e9;
   x1 /= 1e9;
@@ -135,8 +135,8 @@ find_seek_time_hong_y(long double start_offset_nm, long double end_offset_nm,
 	   a, v, spring_factor);
   }
 
-  y0 = min(start_offset_nm, end_offset_nm);
-  y1 = max(start_offset_nm, end_offset_nm);
+  y0 = dmin(start_offset_nm, end_offset_nm);
+  y1 = dmax(start_offset_nm, end_offset_nm);
 
   y0 /= 1e9;
   y1 /= 1e9;

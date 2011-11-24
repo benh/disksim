@@ -1,0 +1,210 @@
+
+# DiskSim SSD support
+# ©2008 Microsoft Corporation. All Rights Reserved
+
+# careful:  this file doesn't like CRLF, and must contain TAB separators
+
+PARAM MODULE ssd
+HEADER \#include "../ssd.h"
+RESTYPE struct ssd *
+PROTO struct ssd *ssdmodel_ssd_loadparams(struct lp_block *b, int *num);
+
+PARAM Scheduler		BLOCK	1
+TEST result->queue = (struct ioq *)disksim_ioqueue_loadparams(blk, device_printqueuestats, device_printcritstats, device_printidlestats, device_printintarrstats, device_printsizestats)
+# INIT ioqueue_initialize(result->queue, 0);
+
+An ioqueue; see Section \ref{param.queue}
+
+PARAM Max queue length	I	1
+TEST (i >= 0)
+INIT result->maxqlen = i;
+
+Specifies the maximum number of requests that can be outstanding at
+the device's queue.
+
+PARAM Block count	I	0
+TEST (i > 0)
+INIT result->numblocks = i;
+
+PARAM Bus transaction latency	D	0
+TEST (d >= 0.0)
+INIT result->bus_transaction_latency = d;
+
+Specifies the bulk sector transfer time in milliseconds.  This is the
+time that it takes to transfer a single sector from the media.
+
+PARAM Bulk sector transfer time		D	1
+TEST (d >= 0.0)
+INIT result->blktranstime = d;
+
+Specifies the bulk sector transfer time in milliseconds.  This is the
+time that it takes to transfer a single sector from the media.
+
+PARAM Never disconnect		I	1
+TEST RANGE(i,0,1)
+INIT result->neverdisconnect = i;
+
+PARAM Print stats		I	1
+TEST RANGE(i,0,1)
+INIT result->printstats = i;
+
+This specifies whether or not statistics for the device will be reported.
+
+PARAM Command overhead		D	1
+TEST (d >= 0.0)
+INIT result->overhead = d;
+
+This specifies a per-request processing overhead that takes place
+immediately after the arrival of a new request at the device.
+
+PARAM Timing model		I	1
+TEST RANGE(i,SSD_SIMPLE_MODEL,SSD_LOGDISK_MODEL)
+INIT result->params.ssd_model = i;
+
+PARAM Flash chip elements	I	1
+RANGE(i,1,SSD_MAX_ELEMENTS)))
+TEST (i >= 0)
+INIT result->params.nelements = i;
+
+This specifies the number of flash packages inside the SSD.
+
+PARAM Page size			I	1
+TEST (i >= 0)
+INIT result->params.page_size = i;
+
+This specifies the number of sectors in a physical flash page.
+
+PARAM Pages per block		I	1
+TEST (i >= 0)
+INIT result->params.pages_per_block = i;
+
+This specifies the number of physical pages that make an SSD block.
+
+PARAM Blocks per element	I	1
+TEST (i >= 0)
+INIT result->params.blocks_per_element = i;
+
+This specifies the number of blocks in a single flash package.
+
+PARAM Element stride pages	I	1
+TEST (i >= 0)
+INIT result->params.element_stride_pages = i;
+
+This specifies the number of pages per stride per flash package.
+
+PARAM Chip xfer latency		D	1
+TEST (d >= 0)
+INIT result->params.chip_xfer_latency = d;
+
+This specifies the time taken to transfer a byte in a chip. The time
+is specified in ms.
+
+PARAM Page read latency		D	1
+TEST (d >= 0)
+INIT result->params.page_read_latency = d;
+
+This specifies the time taken to read a flash page from the package
+into its register (in ms).
+
+PARAM Page write latency	D	1
+TEST (d >= 0)
+INIT result->params.page_write_latency = d;
+
+This specifies the time taken to write a flash page from the package
+register into the flash memory (in ms).
+
+PARAM Block erase latency	D	1
+TEST (d >= 0)
+INIT result->params.block_erase_latency = d;
+
+This specifies the time taken to erase all the contents of a flash 
+block (in ms).
+
+PARAM Write policy			I	1
+TEST (i >= 0)
+INIT result->params.write_policy = i;
+
+This specifies the different write policies with in the SSD. Currently
+we just support one policy (a log structured design). 
+
+PARAM Reserve pages percentage		I	1
+TEST (i >= 0)
+INIT result->params.reserve_blocks = i;
+
+This specifies a percentage of total pages in the SSD that must be 
+reserved for cleaning.
+
+PARAM Minimum free blocks percentage	I	1
+TEST (i >= 0)
+INIT result->params.min_freeblks_percent = i;
+
+This specifies a threshold such that if the percentage of free blocks 
+drop below this threshold, then it will trigger cleaning in an SSD. 
+
+PARAM Cleaning policy			I	1
+TEST (i >= 0)
+INIT result->params.cleaning_policy = i;
+
+This specifies a cleaning policy to use. Currently we support
+two policies: greedy (2) and wear-aware (3)
+
+PARAM Planes per package		I	1
+TEST (i >= 0)
+INIT result->params.planes_per_pkg = i;
+
+This specifies the number of flash planes within a single package.
+
+PARAM Blocks per plane			I	1
+TEST (i >= 0)
+INIT result->params.blocks_per_plane = i;
+
+This specifies the number of blocks per flash plane.
+
+PARAM Plane block mapping		I	1
+TEST (i >= 0)
+INIT result->params.plane_block_mapping = i;
+
+This specifies different block mapping strategies within a plane.
+There are three strategies: simple concatenation = 1, 
+plane-pair stripping = 2 (not tested), full stripping = 3
+
+PARAM Copy back				I	1
+TEST RANGE(i,0,1)
+INIT result->params.copy_back  = i;
+
+This specifies whether copy back feature is enabled in the flash memory.
+
+PARAM Number of parallel units		I	1
+TEST (i >= 0.0)
+INIT result->params.num_parunits = i;
+
+This specifies the number of parallel units inside a flash package.
+The number of units can be 1 (entire flash package), 2 (two dies within
+a flash package), or 4 (four plane-pairs within a flash package).
+
+PARAM Elements per gang			I	1
+TEST (i >= 0)
+INIT result->params.elements_per_gang = i;
+
+This specifies the number of flash packages that are connected to 
+form a gang.
+
+PARAM Cleaning in background		I	1
+TEST RANGE(i,0,1)
+INIT result->params.cleaning_in_background = i;
+
+This specifies whether cleaning happens stricktly in foreground
+or in foreground and background.
+
+PARAM Gang share			I	1
+TEST (i >= 0)
+INIT result->params.gang_share = i;
+
+This specifies the type of ganging: shared-bus (1) or shared-control (2)
+
+PARAM Allocation pool logic		I	1
+TEST (i >= 0)
+INIT result->params.alloc_pool_logic = i;
+
+This specifies the allocation pool strategy: allocation per gang (0),
+allocation per elem (1), allocation per plane (2)

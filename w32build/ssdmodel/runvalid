@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# run this under Cygwin bash to run the simulator validation suite
+
+RUNVALID_PREFIX=../../w32build/Debug
+export RUNVALID_PREFIX
+cd  ../../ssdmodel/valid
+./runvalid
+

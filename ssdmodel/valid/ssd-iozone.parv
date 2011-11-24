@@ -1,0 +1,305 @@
+disksim_global Global {
+   Init Seed = 42,
+   Real Seed = 42,
+   # Statistic warm-up period = 0.0 seconds,
+   Stat definition file = statdefs
+}
+
+disksim_iosim Sim {
+   I/O Trace Time Scale = 1.0
+}
+
+disksim_stats Stats {
+iodriver stats = disksim_iodriver_stats {
+Print driver size stats = 1,
+Print driver locality stats = 0,
+Print driver blocking stats = 0,
+Print driver interference stats = 0,
+Print driver queue stats = 1,
+Print driver crit stats = 0,
+Print driver idle stats = 1,
+Print driver intarr stats = 0,
+Print driver streak stats = 1,
+Print driver stamp stats = 1,
+Print driver per-device stats = 0 },
+bus stats = disksim_bus_stats {
+Print bus idle stats = 1,
+Print bus arbwait stats = 1 },
+ctlr stats = disksim_ctlr_stats {
+Print controller cache stats = 1,
+Print controller size stats = 1,
+Print controller locality stats = 1,
+Print controller blocking stats = 1,
+Print controller interference stats = 1,
+Print controller queue stats = 1,
+Print controller crit stats = 1,
+Print controller idle stats = 1,
+Print controller intarr stats = 0,
+Print controller streak stats = 1,
+Print controller stamp stats = 1,
+Print controller per-device stats = 1 },
+device stats = disksim_device_stats {
+Print device queue stats = 1,
+Print device crit stats = 0,
+Print device idle stats = 0,
+Print device intarr stats = 0,
+Print device size stats = 0,
+Print device seek stats = 1,
+Print device latency stats = 1,
+Print device xfer stats = 1,
+Print device acctime stats = 1,
+Print device interfere stats = 0,
+Print device buffer stats = 1 },
+process flow stats = disksim_pf_stats {
+Print per-process stats =  0,
+Print per-CPU stats =  0,
+Print all interrupt stats =  0,
+Print sleep stats =  0
+}
+} # end of stats block
+
+
+
+disksim_iodriver DRIVER0 {
+type = 1,
+Constant access time = 0.0,
+Scheduler = disksim_ioqueue {
+Scheduling policy = 3,
+Cylinder mapping strategy = 1,
+Write initiation delay = 0.0,
+Read initiation delay = 0.0,
+Sequential stream scheme = 0,
+Maximum concat size = 128,
+Overlapping request scheme = 0,
+Sequential stream diff maximum = 0,
+Scheduling timeout scheme = 0,
+Timeout time/weight = 6,
+Timeout scheduling = 4,
+Scheduling priority scheme = 0,
+Priority scheduling = 4
+}, # end of Scheduler
+Use queueing in subsystem = 1
+} # end of DRV0 spec
+
+disksim_bus BUSTOP {
+type = 1,
+Arbitration type = 1,
+Arbitration time = 0.0,
+Read block transfer time = 0.0,
+Write block transfer time = 0.0,
+Print stats =  1
+} # end of BUSTOP spec
+
+disksim_bus BUSHBA {
+type = 2,
+Arbitration type = 1,
+Arbitration time = 0.001,
+
+# PCI-E, with 8 lanes with 8b/10b encoding gives 2.0 Gbps per 
+# lane and with 8 lanes we get about 2.0 GBps. So, bulk sector 
+# transfer time is about 0.238 us. SATA/300 can transfer data 
+# at 300 MBps, which amounts to about 1.6276 us per byte.
+
+Read block transfer time = 0.0002384,
+Write block transfer time = 0.0002384,
+#Read block transfer time = 0.0016276,
+#Write block transfer time = 0.0016276,
+
+Print stats =  1
+} # end of BUSHBA spec
+
+disksim_ctlr CTLR0 {
+type = 1,
+Scale for delays = 0.0,
+Bulk sector transfer time = 0.0,
+Maximum queue length = 100,
+Print stats =  1
+} # end of CTLR0 spec
+
+# don't change the order of the following parameters.
+# we use Flash chip elements and Elements per gang to
+# find number of gang -- we need this info before initializing
+# the queue (disksim_ioqueue)
+ssdmodel_ssd SSD {
+     # vp - this is a percentage of total pages in the ssd
+     Reserve pages percentage = 15,
+
+     # vp - min percentage of free blocks needed. if the free 
+     # blocks drop below this, cleaning kicks in
+     Minimum free blocks percentage = 5,
+
+     # vp - a simple read-modify-erase-write policy = 1 (no longer supported)
+     # vp - osr write policy = 2
+     Write policy = 2,
+
+     # vp - random = 1 (not supp), greedy = 2, wear-aware = 3
+     Cleaning policy = 2,
+
+     # vp - number of planes in each flash package (element)
+     Planes per package = 8,
+
+     # vp - number of flash blocks in each plane
+     Blocks per plane = 2048,
+
+     # vp - how the blocks within an element are mapped on a plane
+     # simple concatenation = 1, plane-pair stripping = 2 (not tested),
+     # full stripping = 3
+     Plane block mapping = 3,
+
+     # vp - copy-back enabled (1) or not (0)
+     Copy back = 1,
+
+     # how many parallel units are there?
+     # entire elem = 1, two dies = 2, four plane-pairs = 4
+     Number of parallel units = 1,
+
+     # vp - we use diff allocation logic: chip/plane
+     # each gang = 0, each elem = 1, each plane = 2
+     Allocation pool logic = 1,
+
+     # elements are grouped into a gang
+     Elements per gang = 1,
+
+     # shared bus (1) or shared control (2) gang
+     Gang share = 1,
+
+     # when do we want to do the cleaning?
+     Cleaning in background = 0,
+
+     Command overhead =  0.00,
+     Bus transaction latency =  0.0,
+
+#    Assuming PCI-E, with 8 lanes with 8b/10b encoding.
+#    This gives 2.0 Gbps per lane and with 8 lanes we get about
+#    2.0 GBps. So, bulk sector transfer time is about 0.238 us.
+#    Use the "Read block transfer time" and "Write block transfer time"
+#    from disksim_bus above.
+     Bulk sector transfer time =  0,
+
+     Flash chip elements = 8,
+
+     Page size = 8,
+
+     Pages per block = 64,
+
+     # vp - changing the no of blocks from 16184 to 16384
+     Blocks per element = 16384,
+
+     Element stride pages = 1,
+
+     Never disconnect =  1,
+     Print stats =  1,
+     Max queue length =  20,
+     Scheduler = disksim_ioqueue {
+       Scheduling policy =  1,
+       Cylinder mapping strategy =  0,
+       Write initiation delay =  0,
+       Read initiation delay =  0.0,
+       Sequential stream scheme =  0,
+       Maximum concat size =  0,
+       Overlapping request scheme =  0,
+       Sequential stream diff maximum =  0,
+       Scheduling timeout scheme =  0,
+       Timeout time/weight =  0,
+       Timeout scheduling =  0,
+       Scheduling priority scheme =  0,
+       Priority scheduling =  1
+     },
+     Timing model = 1,
+
+     # vp changing the Chip xfer latency from per sector to per byte
+     Chip xfer latency = 0.000025,
+
+     Page read latency = 0.025,
+     Page write latency = 0.200,
+     Block erase latency = 1.5
+}  # end of SSD spec
+
+
+# component instantiation
+instantiate [ simfoo ]         as  Sim
+instantiate [ statfoo ]         as  Stats
+
+# vp - adding another ssd 
+instantiate [ ssd0x0 ] as  SSD
+
+instantiate [ bustop ]    as  BUSTOP
+instantiate [ busHBA0 ]    as  BUSHBA
+instantiate [ driver0 ]         as  DRIVER0
+instantiate [ ctlrHBA0 ]  as  CTLR0
+
+
+# system topology
+topology disksim_iodriver driver0 [
+     disksim_bus bustop [
+
+          ############## HBA 0 #############################
+          disksim_ctlr ctlrHBA0 [
+               disksim_bus busHBA0 [
+                    ############## Flash-device Raid Controller ###############
+                    ssdmodel_ssd ssd0x0 []
+
+               ]     # end of bus0
+          ]        # end of HBA0
+
+          ############ INSERT MORE HBA's ####################################
+
+     ]           # end of bustop
+]              # end of driver0 (and system topology)
+
+
+# no syncsets
+
+disksim_logorg org0 {
+   Addressing mode = Array,
+   Distribution scheme = Striped,
+   Redundancy scheme = Noredun,
+
+   # vp - added more ssd elements
+   devices = [ ssd0x0 ],
+
+   Stripe unit  =  128,
+   Synch writes for safety =  0,
+   Number of copies =  2,
+   Copy choice on read =  6,
+   RMW vs. reconstruct =  0.5,
+   Parity stripe unit =  128,
+   Parity rotation type =  1,
+   Time stamp interval =  0.000000,
+   Time stamp start time =  60000.000000,
+   Time stamp stop time =  10000000000.000000,
+   Time stamp file name =  stamps
+} # end of logorg org0 spec
+
+disksim_pf Proc {
+   Number of processors =  1,
+   Process-Flow Time Scale =  1.0
+} # end of process flow spec
+
+disksim_synthio Synthio {
+   Number of I/O requests to generate =  10000,
+   Maximum time of trace generated  =  1000.0,
+   System call/return with each request =  0,
+   Think time from call to request =  0.0,
+   Think time from request to return =  0.0,
+Generators = [
+disksim_synthgen { # generator 0
+   Storage capacity per device  =  6156008,
+   devices = [ org0 .. org13 ],
+   Blocking factor =  8,
+   Probability of sequential access =  0.0,
+   Probability of local access =  0.0,
+   Probability of read access =  0.66,
+   Probability of time-critical request =  0.0,
+   Probability of time-limited request =  0.0,
+   Time-limited think times  = [ normal, 30.0, 100.0  ],
+   General inter-arrival times  = [ exponential, 0.0, 5.0  ],
+   Sequential inter-arrival times  = [ normal, 0.0, 0.0  ],
+   Local inter-arrival times  = [ exponential, 0.0, 0.0  ],
+   Local distances  = [ normal, 0.0, 40000.0  ],
+   Sizes  = [ exponential, 0.0, 8.0  ]
+} # end of generator 0
+] # end of generator list
+} # end of synthetic workload spec
+
+

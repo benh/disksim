@@ -258,6 +258,8 @@ fprintf (outputfile, "%f: io_internal_event entered with event type %d, %f\n", c
    case MEMS_BUS_INITIATE:
    case MEMS_BUS_TRANSFER:
    case MEMS_BUS_UPDATE:
+   case SSD_CLEAN_ELEMENT:
+   case SSD_CLEAN_GANG:
      device_event_arrive(curr);
      break;
 

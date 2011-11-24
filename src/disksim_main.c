@@ -63,8 +63,10 @@ int main (int argc, char **argv)
   int len;
 
 
+#ifndef _WIN32
   setlinebuf(stdout);
   setlinebuf(stderr);
+#endif
 
   if(argc == 2) {
      disksim_restore_from_checkpoint (argv[1]);

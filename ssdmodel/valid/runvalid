@@ -1,0 +1,48 @@
+#!/bin/sh
+
+if [ "x${RUNVALID_PREFIX}" != "x" ];
+then
+PREFIX=${RUNVALID_PREFIX}
+else
+PREFIX=../../src
+fi
+
+echo "---Running tests with the synthetic workload generator---"
+echo ""
+
+echo "Sequential read (250K I/Os): average SSD response time should be around 0.132 ms"
+$PREFIX/disksim ssd-sr250k.parv ssd-sr250k.outv ascii 0 1 
+grep "ssd Response time average:" ssd-sr250k.outv | grep -v "#"
+
+echo "Sequential write (250K I/Os): average SSD response time should be around 0.310 ms"
+$PREFIX/disksim ssd-sw250k.parv ssd-sw250k.outv ascii 0 1 
+grep "ssd Response time average:" ssd-sw250k.outv | grep -v "#"
+
+echo "Sequential write (5M I/Os): average SSD response time should be around 0.334 ms"
+$PREFIX/disksim ssd-sw5m.parv ssd-sw5m.outv ascii 0 1 
+grep "ssd Response time average:" ssd-sw5m.outv | grep -v "#"
+
+echo "Random read (250K I/Os): average SSD response time should be around 0.136 ms"
+$PREFIX/disksim ssd-rr250k.parv ssd-rr250k.outv ascii 0 1 
+grep "ssd Response time average:" ssd-rr250k.outv | grep -v "#"
+
+echo "Random write (250K I/Os): average SSD response time should be around 0.329 ms"
+$PREFIX/disksim ssd-rw250k.parv ssd-rw250k.outv ascii 0 1 
+grep "ssd Response time average:" ssd-rw250k.outv | grep -v "#"
+
+echo "Random write (5M I/Os): average SSD response time should be around 0.593 ms"
+$PREFIX/disksim ssd-rw5m.parv ssd-rw5m.outv ascii 0 1 
+grep "ssd Response time average:" ssd-rw5m.outv | grep -v "#"
+
+echo "---Running tests with the real traces---"
+echo ""
+
+echo "IOzone: average SSD response time should be around 6.394276 ms"
+$PREFIX/disksim ssd-iozone.parv ssd-iozone.outv ascii ssd-iozone-aligned2-100K.trace 0 
+grep "ssd Response time average:" ssd-iozone.outv | grep -v "#"
+
+echo "Postmark: average SSD response time should be around 4.140330 ms"
+$PREFIX/disksim ssd-postmark.parv ssd-postmark.outv ascii ssd-postmark-aligned2.trace 0 
+grep "ssd Response time average:" ssd-postmark.outv | grep -v "#"
+
+

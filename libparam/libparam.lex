@@ -34,12 +34,18 @@
 
 %{
 #include <string.h>
+#ifndef WIN32
 #include <libgen.h> // dirname(), basename()
+#endif
 #include <libddbg/libddbg.h>
 #include <errno.h>
 
 #include "libparam.h"
 #include "libparam.tab.h"
+
+#ifdef WIN32
+   extern double strtod();
+#endif
 
 #define MAX_INPUT_FILES 32
   int top_file = 0;
@@ -140,6 +146,16 @@ as as
 
   paths[top_path++] = lp_cwd;
 
+#ifdef WIN32
+  // Dushyanth: an empty directory component is same as "."
+  if (!strcmp(dir, ""))
+	strcpy(dir, ".");
+	
+  if (!strcmp(lp_cwd,"")) {
+	lp_cwd = ".";
+	paths[top_path-1] = lp_cwd;
+	}
+#endif
 
   // XXX move all of this logic into util.c
 
@@ -186,7 +202,7 @@ as as
       goto fail;
     }
   }
-  
+
 
  fail:
     fprintf(stderr, "*** error: couldn't open %s : %s\n", yytext, strerror(errno));

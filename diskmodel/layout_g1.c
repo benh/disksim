@@ -106,7 +106,11 @@
 
 // Compute start + mult*q and add x for the number of times it 
 // wraps around 0.  This can probably be optimized.
+#ifdef WIN32
+static __inline dm_angle_t 
+#else
 static inline dm_angle_t 
+#endif
 addmult(dm_angle_t start, int mult, dm_angle_t q, dm_angle_t x) 
 {
   //  int c;

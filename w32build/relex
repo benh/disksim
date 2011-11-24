@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# run this under Cygwin bash to generate the libparam parser
+
+cd ../libparam
+flex -Plibparam libparam.lex
+bison -plibparam --defines libparam.y
+
+

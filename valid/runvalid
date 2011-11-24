@@ -1,8 +1,12 @@
 #!/bin/sh
 
+if [ "x${RUNVALID_PREFIX}" != "x" ];
+then
+PREFIX=${RUNVALID_PREFIX}
+else
 PREFIX=../src
+fi
 
-echo ""
 echo "These results represent actual drive validation experiments"
 
 echo ""

@@ -39,7 +39,11 @@
 // offset of element p in array base of size s
 static int
 aoffset(void *base, void *p, int s) {
+#ifdef WIN32
+  return ((char *)p - (char *)base) / s;
+#else
   return (p - base) / s;
+#endif
 }
 
 struct lp_list *

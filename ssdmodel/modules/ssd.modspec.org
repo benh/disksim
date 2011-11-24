@@ -1,0 +1,152 @@
+
+# DiskSim SSD support
+# ©2008 Microsoft Corporation. All Rights Reserved
+
+# careful:  this file doesn't like CRLF, and must contain TAB separators
+
+PARAM MODULE ssd
+HEADER \#include "../ssd.h"
+RESTYPE struct ssd *
+PROTO struct ssd *ssdmodel_ssd_loadparams(struct lp_block *b, int *num);
+
+PARAM Scheduler		BLOCK	1
+TEST result->queue = (struct ioq *)disksim_ioqueue_loadparams(blk, device_printqueuestats, device_printcritstats, device_printidlestats, device_printintarrstats, device_printsizestats)
+# INIT ioqueue_initialize(result->queue, 0);
+
+An ioqueue; see Section \ref{param.queue}
+
+PARAM Max queue length	I	1
+TEST (i >= 0)
+INIT result->maxqlen = i;
+
+Specifies the maximum number of requests that can be outstanding at
+the device's queue.
+
+PARAM Block count	I	0
+TEST (i > 0)
+INIT result->numblocks = i;
+
+PARAM Bus transaction latency	D	0
+TEST (d >= 0.0)
+INIT result->bus_transaction_latency = d;
+
+Specifies the bulk sector transfer time in milliseconds.  This is the
+time that it takes to transfer a single sector from the media.
+
+PARAM Bulk sector transfer time		D	1
+TEST (d >= 0.0)
+INIT result->blktranstime = d;
+
+Specifies the bulk sector transfer time in milliseconds.  This is the
+time that it takes to transfer a single sector from the media.
+
+PARAM Never disconnect		I	1
+TEST RANGE(i,0,1)
+INIT result->neverdisconnect = i;
+
+PARAM Print stats		I	1
+TEST RANGE(i,0,1)
+INIT result->printstats = i;
+
+This specifies whether or not statistics for the device will be reported.
+
+PARAM Command overhead		D	1
+TEST (d >= 0.0)
+INIT result->overhead = d;
+
+This specifies a per-request processing overhead that takes place
+immediately after the arrival of a new request at the device.
+
+PARAM Timing model		I	1
+TEST RANGE(i,SSD_SIMPLE_MODEL,SSD_LOGDISK_MODEL)
+INIT result->params.ssd_model = i;
+
+PARAM Flash chip elements	I	1
+RANGE(i,1,SSD_MAX_ELEMENTS)))
+TEST (i >= 0)
+INIT result->params.nelements = i;
+
+PARAM Page size			I	1
+TEST (i >= 0)
+INIT result->params.page_size = i;
+
+PARAM Pages per block		I	1
+TEST (i >= 0)
+INIT result->params.pages_per_block = i;
+
+PARAM Blocks per element	I	1
+TEST (i >= 0)
+INIT result->params.blocks_per_element = i;
+
+PARAM Element stride pages	I	1
+TEST (i >= 0)
+INIT result->params.element_stride_pages = i;
+
+PARAM Chip xfer latency		D	1
+TEST (d >= 0)
+INIT result->params.chip_xfer_latency = d;
+
+PARAM Page read latency		D	1
+TEST (d >= 0)
+INIT result->params.page_read_latency = d;
+
+PARAM Page write latency	D	1
+TEST (d >= 0)
+INIT result->params.page_write_latency = d;
+
+PARAM Block erase latency	D	1
+TEST (d >= 0)
+INIT result->params.block_erase_latency = d;
+
+PARAM Write policy			I	1
+TEST (i >= 0)
+INIT result->params.write_policy = i;
+
+PARAM Reserve pages percentage		I	1
+TEST (i >= 0)
+INIT result->params.reserve_blocks = i;
+
+PARAM Minimum free blocks percentage	I	1
+TEST (i >= 0)
+INIT result->params.min_freeblks_percent = i;
+
+PARAM Cleaning policy			I	1
+TEST (i >= 0)
+INIT result->params.cleaning_policy = i;
+
+PARAM Planes per package		I	1
+TEST (i >= 0)
+INIT result->params.planes_per_pkg = i;
+
+PARAM Blocks per plane			I	1
+TEST (i >= 0)
+INIT result->params.blocks_per_plane = i;
+
+PARAM Plane block mapping		I	1
+TEST (i >= 0)
+INIT result->params.plane_block_mapping = i;
+
+PARAM Copy back				I	1
+TEST RANGE(i,0,1)
+INIT result->params.copy_back  = i;
+
+PARAM Number of parallel units		I	1
+TEST (i >= 0.0)
+INIT result->params.num_parunits = i;
+
+PARAM Elements per gang			I	1
+TEST (i >= 0)
+INIT result->params.elements_per_gang = i;
+
+PARAM Cleaning in background		I	1
+TEST RANGE(i,0,1)
+INIT result->params.cleaning_in_background = i;
+
+PARAM Gang share			I	1
+TEST (i >= 0)
+INIT result->params.gang_share = i;
+
+PARAM Allocation pool logic		I	1
+TEST (i >= 0)
+INIT result->params.alloc_pool_logic = i;
+

@@ -38,12 +38,18 @@ extern "C" {
 
 
 // this ought to work and I can't figure out why it doesn't
-#if defined _DISKMODEL_FREEBSD // || defined _BSD_SOURCE
+#ifdef _DISKMODEL_FREEBSD // || defined _BSD_SOURCE
 #include <sys/types.h>
 #else
+#ifdef WIN32
+typedef __int64 int64_t;
+typedef unsigned __int64 uint64_t;
+typedef unsigned __int32 uint32_t;
+typedef unsigned __int16 uint16_t;
+#else /* WIN32 */
 #include <inttypes.h>
-#endif // _DISKMODEL_FREEBSD
-
+#endif /* WIN32 */
+#endif
 
 // fraction of a circle
 // each increment ends up being \pi / 2^32 radians

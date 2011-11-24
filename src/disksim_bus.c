@@ -739,7 +739,14 @@ int load_bus_topo(struct lp_topospec *t, int *parentctlno) {
   assert(!strcmp(t->type, disksim_mods[DISKSIM_MOD_BUS]->name));
 
   /* lookup bus */
-  assert(b = getbusbyname(t->name, &busno));
+#ifdef WIN32
+   /* XXX fixed by dnarayan; don't put side-effects in the assert arg, they might get macro'd out */
+   /* original code: assert(b = getbusbyname(t->name, &busno)); */
+   b = getbusbyname(t->name, &busno);
+   assert(b);
+#else
+   assert(b = getbusbyname(t->name, &busno));
+#endif
 
   b->numslots = 0;
   for(c = 0; c < t->l->values_len; c++)
@@ -792,6 +799,8 @@ int load_bus_topo(struct lp_topospec *t, int *parentctlno) {
 	(type == lp_mod_name("disksim_simpledisk"))
 	||
 	(type == lp_mod_name("memsmodel_mems"))
+	|| /*SSD:*/
+        (type == lp_mod_name("ssdmodel_ssd"))
 	)
       {
 	b->slots[slotnum].devtype = DEVICE;
