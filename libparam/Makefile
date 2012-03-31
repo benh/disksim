@@ -39,6 +39,8 @@ FLEX=flex
 BISON=bison
 YACC=$(BISON)
 
+CC = cc -m32
+
 CFLAGS=-g -I$(LIBDDBG_INCL) -Wall
 
 # input file parser

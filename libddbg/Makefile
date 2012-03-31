@@ -29,6 +29,7 @@
 
 
 
+CC = cc -m32
 
 # needs bitvector.h
 # -D_LIBDDBG_FREEBSD for freebsd kernel

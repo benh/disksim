@@ -34,6 +34,8 @@ include .paths
 DISKSIM_CFLAGS=-I../../src
 DISKSIM_LDFLAGS=-L../../src -ldisksim
 
+CC = cc -m32
+
 CFLAGS = -g \
         $(DISKSIM_CFLAGS) \
         $(DISKMODEL_CFLAGS) \

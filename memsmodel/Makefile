@@ -36,7 +36,7 @@ PROF_OFLAGS = -g -DASSERTS -p
 GPROF_OFLAGS = -g -DASSERTS -pg
 CFLAGS = $(DEBUG_OFLAGS) $(DISKSIM_CFLAGS) -I../ -I$(DISKSIM_PREFIX)/src
 
-CC = gcc -Wall -Wno-unused -MD
+CC = gcc -m32 -Wall -Wno-unused -MD
 CP = cp -p
 
 all: modules mems_seektest libmemsmodel.a

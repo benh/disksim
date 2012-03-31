@@ -2,6 +2,7 @@
 
 include .paths
 
+CC = cc -m32
 
 CFLAGS = -g $(DISKSIM_CFLAGS) $(DISKMODEL_CFLAGS) $(LIBPARAM_CFLAGS) $(LIBDDBG_CFLAGS) -Wall -Wno-unused
 
