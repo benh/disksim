@@ -47,9 +47,9 @@ CFLAGS = -I. $(DISKMODEL_CFLAGS) $(LIBPARAM_CFLAGS) $(LIBDDBG_CFLAGS) $(DEBUG_OF
 FBSYSSIM_OFLAGS = -O6 -fomit-frame-pointer -fexpensive-optimizations -fschedule-insns2
 
 #CC = cc
-CC = gcc -Wall -Wno-unused -MD
+CC = gcc -m32 -Wall -Wno-unused -MD
 # because purify spits out warnings on stdout...
-CC-DEP = gcc $(LIBPARAM_CFLAGS) $(DISKMODEL_CFLAGS)
+CC-DEP = gcc -m32 $(LIBPARAM_CFLAGS) $(DISKMODEL_CFLAGS)
 
 # The following lines create a dependency target based on the state of 
 # the modules files. If the .c and .h files are not created, the dependency
